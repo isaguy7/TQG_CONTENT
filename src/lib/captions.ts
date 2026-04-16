@@ -38,6 +38,10 @@ export async function fetchYoutubeCaptions(
   signal?: AbortSignal
 ): Promise<CaptionResult | null> {
   const workDir = await mkdtemp(path.join(tmpdir(), "tqg-captions-"));
+  const debug = process.env.TQG_CAPTIONS_DEBUG === "1";
+  const log = (msg: string) => {
+    if (debug) console.log(`[captions] ${msg}`);
+  };
 
   try {
     const args = [
@@ -45,9 +49,10 @@ export async function fetchYoutubeCaptions(
       "--write-subs",
       "--write-auto-subs",
       "--sub-langs",
-      `${language}.*,${language}`,
+      // Match 'en', 'en-US', 'en-GB', 'en-orig', etc.
+      `${language},${language}-*,${language}.*`,
       "--sub-format",
-      "vtt",
+      "vtt/best",
       "--convert-subs",
       "vtt",
       "--no-warnings",
@@ -56,30 +61,35 @@ export async function fetchYoutubeCaptions(
       url,
     ];
 
-    const { code } = await runYtdlp(args, signal);
+    log(`Running yt-dlp: ${args.join(" ")}`);
+    const { code, stderr } = await runYtdlp(args, signal);
+    log(`yt-dlp exit ${code}. stderr tail:\n${stderr.split(/\r?\n/).slice(-8).join("\n")}`);
 
-    // yt-dlp exits 0 even if no subs are found (it just prints "No subtitles")
     if (code !== 0) {
-      // Don't throw — captions are a best-effort fast path.
+      log("yt-dlp failed; skipping captions path");
       return null;
     }
 
-    // Find the VTT file. Preference: manual > auto.
     const files = await readdir(workDir);
-    const vttFiles = files.filter((f) => f.endsWith(".vtt"));
-    if (vttFiles.length === 0) return null;
+    log(`workDir files: ${files.join(", ") || "(none)"}`);
 
-    // yt-dlp names them sub.en.vtt (manual) or sub.en.auto.vtt style.
-    // Detect auto via filename hint; fallback to any VTT.
+    const vttFiles = files.filter((f) => f.endsWith(".vtt"));
+    if (vttFiles.length === 0) {
+      log("no .vtt files found — captions unavailable for this video");
+      return null;
+    }
+
     const manual = vttFiles.find(
       (f) => !/\.auto\.|-auto\.|\.orig\./i.test(f)
     );
     const picked = manual || vttFiles[0];
     const isAuto = !manual;
+    log(`picked ${picked} (${isAuto ? "auto" : "manual"})`);
 
     const vttPath = path.join(workDir, picked);
     const vttText = await readFile(vttPath, "utf-8");
     const segments = parseVtt(vttText);
+    log(`parsed ${segments.length} segments`);
 
     if (segments.length === 0) return null;
 
@@ -90,7 +100,8 @@ export async function fetchYoutubeCaptions(
       aligned: false,
       source: isAuto ? "youtube-auto" : "youtube-manual",
     };
-  } catch {
+  } catch (err) {
+    log(`threw: ${(err as Error).message}`);
     return null;
   } finally {
     await rm(workDir, { recursive: true, force: true }).catch(() => {});
