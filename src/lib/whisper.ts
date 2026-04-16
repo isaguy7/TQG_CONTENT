@@ -5,6 +5,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { WhisperResult, WhisperSegment } from "@/lib/transcript";
+import { killTree } from "@/lib/kill-tree";
 
 export type { WhisperResult, WhisperSegment, WhisperWord } from "@/lib/transcript";
 
@@ -103,7 +104,7 @@ export async function transcribe(opts: TranscribeOptions): Promise<WhisperResult
       const timeout =
         TRANSCRIBE_TIMEOUT_MS > 0
           ? setTimeout(() => {
-              child.kill("SIGKILL");
+              killTree(child);
               reject(
                 new Error(
                   `WhisperX timed out after ${Math.round(
@@ -115,9 +116,7 @@ export async function transcribe(opts: TranscribeOptions): Promise<WhisperResult
           : null;
 
       const abortHandler = () => {
-        try {
-          child.kill("SIGKILL");
-        } catch {}
+        killTree(child);
         if (timeout) clearTimeout(timeout);
         reject(new Error("Transcription aborted"));
       };

@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { mkdir } from "node:fs/promises";
+import { killTree } from "@/lib/kill-tree";
 
 const FFMPEG_BIN = process.env.FFMPEG_BIN || "ffmpeg";
 
@@ -66,9 +67,7 @@ function runFfmpeg(args: string[], signal?: AbortSignal): Promise<void> {
     const child = spawn(FFMPEG_BIN, args, { shell: false });
     let stderr = "";
     const abortHandler = () => {
-      try {
-        child.kill("SIGKILL");
-      } catch {}
+      killTree(child);
       reject(new Error("ffmpeg aborted"));
     };
     if (signal) {

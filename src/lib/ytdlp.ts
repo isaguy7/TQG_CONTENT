@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { mkdir, access, readdir } from "node:fs/promises";
 import path from "node:path";
+import { killTree } from "@/lib/kill-tree";
 
 export type YtDlpProgress = {
   type: "progress";
@@ -111,9 +112,7 @@ export async function downloadVideo(opts: DownloadOptions): Promise<YtDlpResult>
     let stderrBuf = "";
 
     const abortHandler = () => {
-      try {
-        child.kill("SIGKILL");
-      } catch {}
+      killTree(child);
       reject(new Error("Download aborted"));
     };
     if (signal) {
@@ -191,9 +190,7 @@ export async function getMetadata(url: string, signal?: AbortSignal): Promise<Yt
     const child = spawn(cmd, fullArgs, { shell: false });
 
     const abortHandler = () => {
-      try {
-        child.kill("SIGKILL");
-      } catch {}
+      killTree(child);
       reject(new Error("Metadata lookup aborted"));
     };
     if (signal) {

@@ -5,6 +5,7 @@ import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { WhisperResult, WhisperSegment } from "@/lib/transcript";
+import { killTree } from "@/lib/kill-tree";
 
 const YTDLP_BIN = process.env.YTDLP_BIN || "yt-dlp";
 const PYTHON_BIN =
@@ -118,9 +119,7 @@ function runYtdlp(
     let stderr = "";
 
     const abortHandler = () => {
-      try {
-        child.kill("SIGKILL");
-      } catch {}
+      killTree(child);
       reject(new Error("yt-dlp aborted"));
     };
     if (signal) {
