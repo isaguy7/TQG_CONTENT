@@ -34,6 +34,7 @@ export type TranscribeMeta = {
 export type TranscribeOptions = {
   audioPath: string;
   language?: string;
+  signal?: AbortSignal;
   onStderrLine?: (line: string) => void;
   onMeta?: (meta: TranscribeMeta) => void;
   onSegment?: (segment: WhisperSegment) => void;
@@ -57,6 +58,7 @@ export async function transcribe(opts: TranscribeOptions): Promise<WhisperResult
   const {
     audioPath,
     language = "auto",
+    signal,
     onStderrLine,
     onMeta,
     onSegment,
@@ -112,6 +114,18 @@ export async function transcribe(opts: TranscribeOptions): Promise<WhisperResult
             }, TRANSCRIBE_TIMEOUT_MS)
           : null;
 
+      const abortHandler = () => {
+        try {
+          child.kill("SIGKILL");
+        } catch {}
+        if (timeout) clearTimeout(timeout);
+        reject(new Error("Transcription aborted"));
+      };
+      if (signal) {
+        if (signal.aborted) abortHandler();
+        else signal.addEventListener("abort", abortHandler, { once: true });
+      }
+
       child.stderr.setEncoding("utf-8");
       child.stderr.on("data", (chunk: string) => {
         stderrBuf += chunk;
@@ -145,6 +159,7 @@ export async function transcribe(opts: TranscribeOptions): Promise<WhisperResult
 
       child.on("error", (err: NodeJS.ErrnoException) => {
         if (timeout) clearTimeout(timeout);
+        if (signal) signal.removeEventListener("abort", abortHandler);
         if (err.code === "ENOENT") {
           reject(
             new Error(
@@ -159,6 +174,8 @@ export async function transcribe(opts: TranscribeOptions): Promise<WhisperResult
       });
       child.on("close", (code) => {
         if (timeout) clearTimeout(timeout);
+        if (signal) signal.removeEventListener("abort", abortHandler);
+        if (signal?.aborted) return;
         resolve({ code: code ?? 1 });
       });
     });

@@ -63,6 +63,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const abortController = new AbortController();
+  const { signal } = abortController;
+
+  // Hook up client disconnects too — when the browser drops the fetch,
+  // Next surfaces that via req.signal. Kill subprocesses immediately.
+  req.signal.addEventListener("abort", () => abortController.abort(), {
+    once: true,
+  });
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const send = (ev: Event) => {
@@ -74,12 +83,10 @@ export async function POST(req: NextRequest) {
       try {
         send({ phase: "start", url });
 
-        // ============================================================
-        // Tier 1: YouTube captions (fast path — 2-5s typical)
-        // ============================================================
         if (!forceWhisper) {
           send({ phase: "captions-try" });
-          const captions = await fetchYoutubeCaptions(url);
+          const captions = await fetchYoutubeCaptions(url, "en", signal);
+          if (signal.aborted) return;
           if (captions) {
             let meta: { title: string; duration: number | null; channel: string | null } = {
               title: "video",
@@ -87,29 +94,27 @@ export async function POST(req: NextRequest) {
               channel: null,
             };
             try {
-              const info = await getMetadata(url);
+              const info = await getMetadata(url, signal);
               meta = {
                 title: info.title,
                 duration: info.duration,
                 channel: info.channel,
               };
             } catch {}
+            if (signal.aborted) return;
             send({
               phase: "done",
               source: captions.source,
               transcript: captions,
               metadata: meta,
             });
-            controller.close();
             return;
           }
         }
 
-        // ============================================================
-        // Tier 2: Full pipeline (yt-dlp → ffmpeg → WhisperX streaming)
-        // ============================================================
         const { videoPath, metadata } = await downloadVideo({
           url,
+          signal,
           onProgress: (p) =>
             send({
               phase: "download",
@@ -119,14 +124,17 @@ export async function POST(req: NextRequest) {
               stage: p.stage,
             }),
         });
+        if (signal.aborted) return;
 
         send({ phase: "extract" });
-        const audioPath = await extractAudioForWhisper(videoPath);
+        const audioPath = await extractAudioForWhisper(videoPath, undefined, signal);
+        if (signal.aborted) return;
 
         send({ phase: "transcribe" });
         let totalDuration = 0;
         const result = await transcribe({
           audioPath,
+          signal,
           onMeta: (m) => {
             totalDuration = m.duration;
             send({
@@ -153,6 +161,7 @@ export async function POST(req: NextRequest) {
             }
           },
         });
+        if (signal.aborted) return;
 
         send({
           phase: "done",
@@ -165,6 +174,8 @@ export async function POST(req: NextRequest) {
           },
         });
       } catch (err) {
+        // Swallow aborted errors — the client already knows they cancelled.
+        if (signal.aborted) return;
         const e = err as Error & {
           details?: { stderrTail?: string; traceback?: string };
         };
@@ -175,8 +186,14 @@ export async function POST(req: NextRequest) {
           traceback: e.details?.traceback,
         });
       } finally {
-        controller.close();
+        try {
+          controller.close();
+        } catch {}
       }
+    },
+    cancel() {
+      // Client disconnected or explicitly cancelled — kill all subprocesses.
+      abortController.abort();
     },
   });
 

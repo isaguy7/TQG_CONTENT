@@ -77,21 +77,22 @@ function parseProgressLine(line: string): YtDlpProgress | null {
 export type DownloadOptions = {
   url: string;
   maxHeight?: number;
+  signal?: AbortSignal;
   onProgress?: (p: YtDlpProgress) => void;
   onStderr?: (line: string) => void;
 };
 
 export async function downloadVideo(opts: DownloadOptions): Promise<YtDlpResult> {
-  const { url, maxHeight = 2160, onProgress, onStderr } = opts;
+  const { url, maxHeight = 2160, signal, onProgress, onStderr } = opts;
   await mkdir(DOWNLOADS_DIR, { recursive: true });
 
-  const metadata = await getMetadata(url);
+  const metadata = await getMetadata(url, signal);
   const safeTitle = sanitize(metadata.title || "video");
   const outputTemplate = path.join(DOWNLOADS_DIR, `${safeTitle}.%(ext)s`);
 
   const args = [
     "--no-playlist",
-    "--newline", // one progress line per update, easier to parse
+    "--newline",
     "--no-colors",
     "--no-warnings",
     "-f",
@@ -108,6 +109,17 @@ export async function downloadVideo(opts: DownloadOptions): Promise<YtDlpResult>
     const child = spawn(cmd, fullArgs, { shell: false });
 
     let stderrBuf = "";
+
+    const abortHandler = () => {
+      try {
+        child.kill("SIGKILL");
+      } catch {}
+      reject(new Error("Download aborted"));
+    };
+    if (signal) {
+      if (signal.aborted) abortHandler();
+      else signal.addEventListener("abort", abortHandler, { once: true });
+    }
 
     child.stdout.setEncoding("utf-8");
     child.stderr.setEncoding("utf-8");
@@ -128,6 +140,7 @@ export async function downloadVideo(opts: DownloadOptions): Promise<YtDlpResult>
     });
 
     child.on("error", (err: NodeJS.ErrnoException) => {
+      if (signal) signal.removeEventListener("abort", abortHandler);
       if (err.code === "ENOENT") {
         reject(
           new Error(
@@ -147,6 +160,8 @@ export async function downloadVideo(opts: DownloadOptions): Promise<YtDlpResult>
       reject(err);
     });
     child.on("close", (code) => {
+      if (signal) signal.removeEventListener("abort", abortHandler);
+      if (signal?.aborted) return; // already rejected
       if (code === 0) resolve();
       else reject(new Error(`yt-dlp exited ${code}. stderr:\n${tailLines(stderrBuf, 20)}`));
     });
@@ -165,7 +180,7 @@ export async function downloadVideo(opts: DownloadOptions): Promise<YtDlpResult>
   return { videoPath, metadata };
 }
 
-export async function getMetadata(url: string): Promise<YtDlpMetadata> {
+export async function getMetadata(url: string, signal?: AbortSignal): Promise<YtDlpMetadata> {
   return new Promise((resolve, reject) => {
     const { cmd, fullArgs } = resolveCommand([
       "--no-playlist",
@@ -174,6 +189,18 @@ export async function getMetadata(url: string): Promise<YtDlpMetadata> {
       url,
     ]);
     const child = spawn(cmd, fullArgs, { shell: false });
+
+    const abortHandler = () => {
+      try {
+        child.kill("SIGKILL");
+      } catch {}
+      reject(new Error("Metadata lookup aborted"));
+    };
+    if (signal) {
+      if (signal.aborted) abortHandler();
+      else signal.addEventListener("abort", abortHandler, { once: true });
+    }
+
     let stdout = "";
     let stderr = "";
     child.stdout.setEncoding("utf-8");
@@ -181,6 +208,7 @@ export async function getMetadata(url: string): Promise<YtDlpMetadata> {
     child.stdout.on("data", (c: string) => (stdout += c));
     child.stderr.on("data", (c: string) => (stderr += c));
     child.on("error", (err: NodeJS.ErrnoException) => {
+      if (signal) signal.removeEventListener("abort", abortHandler);
       if (err.code === "ENOENT") {
         reject(
           new Error(
@@ -192,6 +220,8 @@ export async function getMetadata(url: string): Promise<YtDlpMetadata> {
       reject(err);
     });
     child.on("close", (code) => {
+      if (signal) signal.removeEventListener("abort", abortHandler);
+      if (signal?.aborted) return;
       if (code !== 0) {
         return reject(
           new Error(`yt-dlp metadata exited ${code}. stderr:\n${tailLines(stderr, 20)}`)

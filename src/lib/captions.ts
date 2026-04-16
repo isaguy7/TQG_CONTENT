@@ -34,7 +34,8 @@ export type CaptionResult = WhisperResult & {
  */
 export async function fetchYoutubeCaptions(
   url: string,
-  language: string = "en"
+  language: string = "en",
+  signal?: AbortSignal
 ): Promise<CaptionResult | null> {
   const workDir = await mkdtemp(path.join(tmpdir(), "tqg-captions-"));
 
@@ -55,7 +56,7 @@ export async function fetchYoutubeCaptions(
       url,
     ];
 
-    const { code, stderr } = await runYtdlp(args);
+    const { code } = await runYtdlp(args, signal);
 
     // yt-dlp exits 0 even if no subs are found (it just prints "No subtitles")
     if (code !== 0) {
@@ -96,14 +97,30 @@ export async function fetchYoutubeCaptions(
   }
 }
 
-function runYtdlp(args: string[]): Promise<{ code: number; stderr: string }> {
+function runYtdlp(
+  args: string[],
+  signal?: AbortSignal
+): Promise<{ code: number; stderr: string }> {
   return new Promise((resolve, reject) => {
     const { cmd, fullArgs } = resolveCommand(args);
     const child = spawn(cmd, fullArgs, { shell: false });
     let stderr = "";
+
+    const abortHandler = () => {
+      try {
+        child.kill("SIGKILL");
+      } catch {}
+      reject(new Error("yt-dlp aborted"));
+    };
+    if (signal) {
+      if (signal.aborted) abortHandler();
+      else signal.addEventListener("abort", abortHandler, { once: true });
+    }
+
     child.stderr.setEncoding("utf-8");
     child.stderr.on("data", (c: string) => (stderr += c));
     child.on("error", (err: NodeJS.ErrnoException) => {
+      if (signal) signal.removeEventListener("abort", abortHandler);
       if (err.code === "ENOENT") {
         reject(
           new Error(
@@ -114,7 +131,11 @@ function runYtdlp(args: string[]): Promise<{ code: number; stderr: string }> {
       }
       reject(err);
     });
-    child.on("close", (code) => resolve({ code: code ?? 1, stderr }));
+    child.on("close", (code) => {
+      if (signal) signal.removeEventListener("abort", abortHandler);
+      if (signal?.aborted) return;
+      resolve({ code: code ?? 1, stderr });
+    });
   });
 }
 

@@ -14,7 +14,8 @@ function tailLines(s: string, n: number): string {
  */
 export async function extractAudioForWhisper(
   videoPath: string,
-  outputDir?: string
+  outputDir?: string,
+  signal?: AbortSignal
 ): Promise<string> {
   const dir = outputDir || path.dirname(videoPath);
   await mkdir(dir, { recursive: true });
@@ -22,7 +23,7 @@ export async function extractAudioForWhisper(
   const audioPath = path.join(dir, `${base}.wav`);
 
   const args = [
-    "-y", // overwrite
+    "-y",
     "-hide_banner",
     "-loglevel",
     "error",
@@ -38,7 +39,7 @@ export async function extractAudioForWhisper(
     audioPath,
   ];
 
-  await runFfmpeg(args);
+  await runFfmpeg(args, signal);
   return audioPath;
 }
 
@@ -60,13 +61,25 @@ export async function getFfmpegVersion(): Promise<string> {
   });
 }
 
-function runFfmpeg(args: string[]): Promise<void> {
+function runFfmpeg(args: string[], signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(FFMPEG_BIN, args, { shell: false });
     let stderr = "";
+    const abortHandler = () => {
+      try {
+        child.kill("SIGKILL");
+      } catch {}
+      reject(new Error("ffmpeg aborted"));
+    };
+    if (signal) {
+      if (signal.aborted) abortHandler();
+      else signal.addEventListener("abort", abortHandler, { once: true });
+    }
+
     child.stderr.setEncoding("utf-8");
     child.stderr.on("data", (c: string) => (stderr += c));
     child.on("error", (err: NodeJS.ErrnoException) => {
+      if (signal) signal.removeEventListener("abort", abortHandler);
       if (err.code === "ENOENT") {
         reject(
           new Error(
@@ -82,6 +95,8 @@ function runFfmpeg(args: string[]): Promise<void> {
       reject(err);
     });
     child.on("close", (code) => {
+      if (signal) signal.removeEventListener("abort", abortHandler);
+      if (signal?.aborted) return;
       if (code === 0) resolve();
       else reject(new Error(`ffmpeg exited ${code}. stderr:\n${tailLines(stderr, 20)}`));
     });
