@@ -10,7 +10,7 @@ export type { WhisperResult, WhisperSegment, WhisperWord } from "@/lib/transcrip
 
 const PYTHON_BIN =
   process.env.PYTHON_BIN || (process.platform === "win32" ? "python" : "python3");
-const WHISPERX_MODEL = process.env.WHISPERX_MODEL || "large-v3";
+const WHISPERX_MODEL = process.env.WHISPERX_MODEL || "large-v3-turbo";
 const WHISPERX_DEVICE = process.env.WHISPERX_DEVICE || "cuda";
 // int8_float16 fits large-v3 comfortably on 8GB VRAM. Bump to float16 for
 // 16GB+ cards for ~5% accuracy improvement. On a 24GB card you can use
