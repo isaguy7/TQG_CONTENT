@@ -24,6 +24,24 @@ export type YtDlpResult = {
 
 const DOWNLOADS_DIR = process.env.DOWNLOADS_DIR || "downloads";
 const YTDLP_BIN = process.env.YTDLP_BIN || "yt-dlp";
+const PYTHON_BIN =
+  process.env.PYTHON_BIN || (process.platform === "win32" ? "python" : "python3");
+
+/**
+ * Resolve the yt-dlp spawn command. If YTDLP_BIN is 'python -m yt_dlp' OR
+ * the user has set YTDLP_USE_PYTHON=1, we call Python's module form. This
+ * avoids Windows PATH issues — particularly with Microsoft Store Python,
+ * which sandboxes .exe scripts outside PATH.
+ */
+function resolveCommand(args: string[]): { cmd: string; fullArgs: string[] } {
+  const usePython =
+    process.env.YTDLP_USE_PYTHON === "1" ||
+    YTDLP_BIN.trim().toLowerCase() === "python -m yt_dlp";
+  if (usePython) {
+    return { cmd: PYTHON_BIN, fullArgs: ["-m", "yt_dlp", ...args] };
+  }
+  return { cmd: YTDLP_BIN, fullArgs: args };
+}
 
 function sanitize(s: string): string {
   return s.replace(/[\\/:*?"<>|]/g, "_").slice(0, 120);
@@ -86,7 +104,8 @@ export async function downloadVideo(opts: DownloadOptions): Promise<YtDlpResult>
   ];
 
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(YTDLP_BIN, args, { shell: false });
+    const { cmd, fullArgs } = resolveCommand(args);
+    const child = spawn(cmd, fullArgs, { shell: false });
 
     let stderrBuf = "";
 
@@ -112,13 +131,15 @@ export async function downloadVideo(opts: DownloadOptions): Promise<YtDlpResult>
       if (err.code === "ENOENT") {
         reject(
           new Error(
-            `yt-dlp not found on PATH (tried '${YTDLP_BIN}').\n\n` +
-              `Install on Windows:\n` +
-              `  pip install yt-dlp\n` +
-              `  # or: winget install yt-dlp.yt-dlp\n` +
-              `  # or: choco install yt-dlp\n\n` +
-              `If installed in a non-PATH location, set YTDLP_BIN in .env.local ` +
-              `to the absolute path to yt-dlp.exe.`
+            `yt-dlp not found (tried '${cmd}').\n\n` +
+              `Fastest fix on Windows — use Python's module form (you already ` +
+              `need Python for WhisperX):\n` +
+              `  1. pip install yt-dlp\n` +
+              `  2. Verify: python -m yt_dlp --version\n` +
+              `  3. In .env.local, set:\n` +
+              `     YTDLP_USE_PYTHON=1\n` +
+              `  4. Restart 'npm run dev'.\n\n` +
+              `Or set YTDLP_BIN to the absolute path of yt-dlp.exe.`
           )
         );
         return;
@@ -146,11 +167,13 @@ export async function downloadVideo(opts: DownloadOptions): Promise<YtDlpResult>
 
 export async function getMetadata(url: string): Promise<YtDlpMetadata> {
   return new Promise((resolve, reject) => {
-    const child = spawn(
-      YTDLP_BIN,
-      ["--no-playlist", "--dump-single-json", "--no-warnings", url],
-      { shell: false }
-    );
+    const { cmd, fullArgs } = resolveCommand([
+      "--no-playlist",
+      "--dump-single-json",
+      "--no-warnings",
+      url,
+    ]);
+    const child = spawn(cmd, fullArgs, { shell: false });
     let stdout = "";
     let stderr = "";
     child.stdout.setEncoding("utf-8");
@@ -161,7 +184,7 @@ export async function getMetadata(url: string): Promise<YtDlpMetadata> {
       if (err.code === "ENOENT") {
         reject(
           new Error(
-            `yt-dlp not found on PATH (tried '${YTDLP_BIN}'). Install: pip install yt-dlp`
+            `yt-dlp not found (tried '${cmd}'). Try: YTDLP_USE_PYTHON=1 in .env.local`
           )
         );
         return;
@@ -191,7 +214,8 @@ export async function getMetadata(url: string): Promise<YtDlpMetadata> {
 
 export async function getYtDlpVersion(): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(YTDLP_BIN, ["--version"], { shell: false });
+    const { cmd, fullArgs } = resolveCommand(["--version"]);
+    const child = spawn(cmd, fullArgs, { shell: false });
     let out = "";
     child.stdout.setEncoding("utf-8");
     child.stdout.on("data", (c: string) => (out += c));
