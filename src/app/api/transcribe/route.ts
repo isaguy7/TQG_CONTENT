@@ -8,7 +8,9 @@ import type { WhisperResult } from "@/lib/transcript";
 // edge runtime. It also needs the full Node request lifetime.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 900; // 15 minutes
+// No maxDuration — local Node server, not Vercel. Long lectures run for
+// as long as they need. WhisperX timeout is controlled separately via
+// WHISPERX_TIMEOUT_MS (default 6h, 0 to disable).
 
 type Event =
   | { phase: "start"; url: string }

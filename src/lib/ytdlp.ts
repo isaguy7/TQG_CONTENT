@@ -108,7 +108,23 @@ export async function downloadVideo(opts: DownloadOptions): Promise<YtDlpResult>
       }
     });
 
-    child.on("error", reject);
+    child.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "ENOENT") {
+        reject(
+          new Error(
+            `yt-dlp not found on PATH (tried '${YTDLP_BIN}').\n\n` +
+              `Install on Windows:\n` +
+              `  pip install yt-dlp\n` +
+              `  # or: winget install yt-dlp.yt-dlp\n` +
+              `  # or: choco install yt-dlp\n\n` +
+              `If installed in a non-PATH location, set YTDLP_BIN in .env.local ` +
+              `to the absolute path to yt-dlp.exe.`
+          )
+        );
+        return;
+      }
+      reject(err);
+    });
     child.on("close", (code) => {
       if (code === 0) resolve();
       else reject(new Error(`yt-dlp exited ${code}. stderr:\n${tailLines(stderrBuf, 20)}`));
@@ -141,7 +157,17 @@ export async function getMetadata(url: string): Promise<YtDlpMetadata> {
     child.stderr.setEncoding("utf-8");
     child.stdout.on("data", (c: string) => (stdout += c));
     child.stderr.on("data", (c: string) => (stderr += c));
-    child.on("error", reject);
+    child.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "ENOENT") {
+        reject(
+          new Error(
+            `yt-dlp not found on PATH (tried '${YTDLP_BIN}'). Install: pip install yt-dlp`
+          )
+        );
+        return;
+      }
+      reject(err);
+    });
     child.on("close", (code) => {
       if (code !== 0) {
         return reject(

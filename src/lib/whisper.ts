@@ -14,8 +14,10 @@ const WHISPERX_MODEL = process.env.WHISPERX_MODEL || "large-v3";
 const WHISPERX_DEVICE = process.env.WHISPERX_DEVICE || "cuda";
 const WHISPERX_COMPUTE_TYPE = process.env.WHISPERX_COMPUTE_TYPE || "float16";
 const WHISPERX_BATCH_SIZE = process.env.WHISPERX_BATCH_SIZE || "16";
+// 0 = no timeout. Default 6h — plenty of headroom for multi-hour lectures
+// on the 4090. Override via WHISPERX_TIMEOUT_MS (milliseconds, 0 to disable).
 const TRANSCRIBE_TIMEOUT_MS = parseInt(
-  process.env.WHISPERX_TIMEOUT_MS || String(10 * 60 * 1000),
+  process.env.WHISPERX_TIMEOUT_MS || String(6 * 60 * 60 * 1000),
   10
 );
 
@@ -75,14 +77,19 @@ export async function transcribe(opts: TranscribeOptions): Promise<WhisperResult
         },
       });
 
-      const timeout = setTimeout(() => {
-        child.kill("SIGKILL");
-        reject(
-          new Error(
-            `WhisperX timed out after ${Math.round(TRANSCRIBE_TIMEOUT_MS / 1000)}s`
-          )
-        );
-      }, TRANSCRIBE_TIMEOUT_MS);
+      const timeout =
+        TRANSCRIBE_TIMEOUT_MS > 0
+          ? setTimeout(() => {
+              child.kill("SIGKILL");
+              reject(
+                new Error(
+                  `WhisperX timed out after ${Math.round(
+                    TRANSCRIBE_TIMEOUT_MS / 1000
+                  )}s. Bump WHISPERX_TIMEOUT_MS in .env.local (0 to disable).`
+                )
+              );
+            }, TRANSCRIBE_TIMEOUT_MS)
+          : null;
 
       child.stderr.setEncoding("utf-8");
       child.stderr.on("data", (chunk: string) => {
@@ -92,12 +99,22 @@ export async function transcribe(opts: TranscribeOptions): Promise<WhisperResult
         }
       });
 
-      child.on("error", (err) => {
-        clearTimeout(timeout);
+      child.on("error", (err: NodeJS.ErrnoException) => {
+        if (timeout) clearTimeout(timeout);
+        if (err.code === "ENOENT") {
+          reject(
+            new Error(
+              `Python not found on PATH (tried '${PYTHON_BIN}').\n\n` +
+                `Set PYTHON_BIN in .env.local to the absolute path of your ` +
+                `Python 3.10+ interpreter, or install Python and add it to PATH.`
+            )
+          );
+          return;
+        }
         reject(err);
       });
       child.on("close", (code) => {
-        clearTimeout(timeout);
+        if (timeout) clearTimeout(timeout);
         resolve({ code: code ?? 1 });
       });
     });

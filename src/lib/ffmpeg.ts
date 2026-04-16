@@ -66,7 +66,21 @@ function runFfmpeg(args: string[]): Promise<void> {
     let stderr = "";
     child.stderr.setEncoding("utf-8");
     child.stderr.on("data", (c: string) => (stderr += c));
-    child.on("error", reject);
+    child.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "ENOENT") {
+        reject(
+          new Error(
+            `ffmpeg not found on PATH (tried '${FFMPEG_BIN}').\n\n` +
+              `Install on Windows:\n` +
+              `  winget install Gyan.FFmpeg\n` +
+              `  # or: choco install ffmpeg-full  (needed for Arabic font rendering)\n\n` +
+              `If installed in a non-PATH location, set FFMPEG_BIN in .env.local.`
+          )
+        );
+        return;
+      }
+      reject(err);
+    });
     child.on("close", (code) => {
       if (code === 0) resolve();
       else reject(new Error(`ffmpeg exited ${code}. stderr:\n${tailLines(stderr, 20)}`));
