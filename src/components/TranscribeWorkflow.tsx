@@ -107,7 +107,26 @@ export function TranscribeWorkflow() {
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
-      setPhase({ kind: "start" });
+
+      // Gate every state update through this closure. Once the user
+      // cancels, controller.signal.aborted is true forever for this run,
+      // so any buffered setPhase becomes a no-op. This is the fix for
+      // 'cancel flips back to transcribing' — the React update queue
+      // could reorder a late setPhase(transcribe-meta) after handleAbort's
+      // setPhase(idle) without this guard.
+      const safeSetPhase = (updater: Phase | ((prev: Phase) => Phase)) => {
+        if (controller.signal.aborted) return;
+        if (typeof updater === "function") {
+          setPhase((prev) => {
+            if (controller.signal.aborted) return prev;
+            return (updater as (p: Phase) => Phase)(prev);
+          });
+        } else {
+          setPhase(updater);
+        }
+      };
+
+      safeSetPhase({ kind: "start" });
 
       try {
         const res = await fetch("/api/transcribe", {
@@ -117,6 +136,7 @@ export function TranscribeWorkflow() {
           signal: controller.signal,
         });
 
+        if (controller.signal.aborted) return;
         if (!res.body) throw new Error("No response stream");
 
         const reader = res.body.getReader();
@@ -124,11 +144,9 @@ export function TranscribeWorkflow() {
         let buffer = "";
 
         while (true) {
-          // If this controller was aborted, stop processing events —
-          // otherwise a buffered 'segment' or 'transcribe' event can
-          // overwrite the idle state set by handleAbort.
           if (controller.signal.aborted) break;
           const { done, value } = await reader.read();
+          if (controller.signal.aborted) break;
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
 
@@ -140,7 +158,7 @@ export function TranscribeWorkflow() {
             if (!line.trim()) continue;
             try {
               const ev = JSON.parse(line) as ServerEvent;
-              setPhase((prev) => reducePhase(prev, ev));
+              safeSetPhase((prev) => reducePhase(prev, ev));
             } catch (parseErr) {
               console.warn("Bad line:", line, parseErr);
             }
@@ -149,10 +167,9 @@ export function TranscribeWorkflow() {
       } catch (err) {
         const e = err as Error;
         if (e.name === "AbortError" || controller.signal.aborted) {
-          // Explicit abort — stay idle.
           return;
         }
-        setPhase({ kind: "error", message: e.message });
+        safeSetPhase({ kind: "error", message: e.message });
       }
     },
     []
