@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { TranscriptViewer } from "@/components/TranscriptViewer";
 import type { WhisperResult } from "@/lib/transcript";
 import { buildSystemPrompt } from "@/lib/system-prompt";
@@ -184,7 +184,37 @@ function applyEvent(ev: ServerEvent, set: (p: Phase) => void) {
   }
 }
 
+function formatDuration(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) seconds = 0;
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function useElapsed(active: boolean): number {
+  const [elapsed, setElapsed] = useState(0);
+  const startRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!active) {
+      startRef.current = null;
+      setElapsed(0);
+      return;
+    }
+    startRef.current = Date.now();
+    const id = setInterval(() => {
+      if (startRef.current) {
+        setElapsed((Date.now() - startRef.current) / 1000);
+      }
+    }, 500);
+    return () => clearInterval(id);
+  }, [active]);
+  return elapsed;
+}
+
 function PhaseStatus({ phase }: { phase: Phase }) {
+  const isTranscribe = phase.kind === "transcribe";
+  const elapsed = useElapsed(isTranscribe);
+
   if (phase.kind === "idle" || phase.kind === "done" || phase.kind === "error") {
     return null;
   }
@@ -192,6 +222,7 @@ function PhaseStatus({ phase }: { phase: Phase }) {
   let label = "Starting…";
   let detail: string | null = null;
   let pct: number | null = null;
+  let subLabel: string | null = null;
 
   if (phase.kind === "download") {
     label = phase.stage === "download" ? "Downloading video" : phase.stage === "merge" ? "Merging video + audio" : "Post-processing";
@@ -205,6 +236,7 @@ function PhaseStatus({ phase }: { phase: Phase }) {
   } else if (phase.kind === "transcribe") {
     label = "Transcribing on GPU (WhisperX)";
     detail = phase.note ?? null;
+    subLabel = `Elapsed ${formatDuration(elapsed)} · WhisperX doesn't report % during inference`;
   }
 
   return (
@@ -215,19 +247,29 @@ function PhaseStatus({ phase }: { phase: Phase }) {
           <span className="text-[11px] text-white/50 tabular-nums">
             {pct.toFixed(1)}%
           </span>
+        ) : isTranscribe ? (
+          <span className="text-[11px] text-white/50 tabular-nums">
+            {formatDuration(elapsed)}
+          </span>
         ) : null}
       </div>
-      <div className="h-1 rounded-full bg-white/[0.05] overflow-hidden">
-        <div
-          className={cn(
-            "h-full bg-primary-hover transition-all",
-            pct === null && "animate-pulse w-1/3"
-          )}
-          style={pct !== null ? { width: `${Math.max(2, pct)}%` } : undefined}
-        />
-      </div>
+      {pct !== null ? (
+        <div className="h-1 rounded-full bg-white/[0.05] overflow-hidden">
+          <div
+            className="h-full bg-primary-hover transition-all"
+            style={{ width: `${Math.max(2, pct)}%` }}
+          />
+        </div>
+      ) : (
+        <div className="h-1 rounded-full bg-white/[0.05] overflow-hidden relative">
+          <div className="absolute inset-y-0 w-1/4 bg-primary-hover/70 animate-[shimmer_1.4s_ease-in-out_infinite]" />
+        </div>
+      )}
+      {subLabel ? (
+        <div className="mt-2 text-[11px] text-white/35">{subLabel}</div>
+      ) : null}
       {detail ? (
-        <div className="mt-2 text-[11px] text-white/40 font-mono truncate">
+        <div className="mt-1 text-[11px] text-white/40 font-mono truncate">
           {detail}
         </div>
       ) : null}

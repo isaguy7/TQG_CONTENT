@@ -54,3 +54,12 @@
     @apply text-[10px] uppercase tracking-[0.08em] text-white/30 font-medium;
   }
 }
+
+@keyframes shimmer {
+  0% {
+    left: -25%;
+  }
+  100% {
+    left: 100%;
+  }
+}
