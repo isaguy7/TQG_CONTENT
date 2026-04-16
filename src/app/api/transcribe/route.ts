@@ -1,19 +1,19 @@
 import { NextRequest } from "next/server";
-import { downloadVideo, type YtDlpProgress } from "@/lib/ytdlp";
+import { downloadVideo, type YtDlpProgress, getMetadata } from "@/lib/ytdlp";
 import { extractAudioForWhisper } from "@/lib/ffmpeg";
 import { transcribe } from "@/lib/whisper";
-import type { WhisperResult } from "@/lib/transcript";
+import { fetchYoutubeCaptions } from "@/lib/captions";
+import type { WhisperResult, WhisperSegment } from "@/lib/transcript";
 
-// This route spawns yt-dlp + ffmpeg + WhisperX. It must never run on the
-// edge runtime. It also needs the full Node request lifetime.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// No maxDuration — local Node server, not Vercel. Long lectures run for
-// as long as they need. WhisperX timeout is controlled separately via
-// WHISPERX_TIMEOUT_MS (default 6h, 0 to disable).
+// No maxDuration — local Node server, not Vercel.
+
+type Source = "youtube-auto" | "youtube-manual" | "whisperx";
 
 type Event =
   | { phase: "start"; url: string }
+  | { phase: "captions-try" }
   | {
       phase: "download";
       percent: number | null;
@@ -22,13 +22,20 @@ type Event =
       stage: YtDlpProgress["stage"];
     }
   | { phase: "extract" }
+  | {
+      phase: "transcribe-meta";
+      duration: number;
+      language: string;
+      model: string;
+    }
+  | { phase: "segment"; segment: WhisperSegment; progress: number }
+  | { phase: "align" }
   | { phase: "transcribe"; line?: string }
   | {
       phase: "done";
+      source: Source;
       transcript: WhisperResult;
       metadata: { title: string; duration: number | null; channel: string | null };
-      videoPath: string;
-      audioPath: string;
     }
   | { phase: "error"; message: string; stderrTail?: string; traceback?: string };
 
@@ -37,7 +44,7 @@ function encodeLine(ev: Event): Uint8Array {
 }
 
 export async function POST(req: NextRequest) {
-  let body: { url?: string };
+  let body: { url?: string; forceWhisper?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -48,6 +55,7 @@ export async function POST(req: NextRequest) {
   }
 
   const url = body.url?.trim();
+  const forceWhisper = Boolean(body.forceWhisper);
   if (!url || !/^https?:\/\//i.test(url)) {
     return new Response(
       JSON.stringify({ error: "Missing or invalid 'url'" }),
@@ -60,15 +68,46 @@ export async function POST(req: NextRequest) {
       const send = (ev: Event) => {
         try {
           controller.enqueue(encodeLine(ev));
-        } catch {
-          // Client disconnected.
-        }
+        } catch {}
       };
 
       try {
         send({ phase: "start", url });
 
-        // 1. Download video
+        // ============================================================
+        // Tier 1: YouTube captions (fast path — 2-5s typical)
+        // ============================================================
+        if (!forceWhisper) {
+          send({ phase: "captions-try" });
+          const captions = await fetchYoutubeCaptions(url);
+          if (captions) {
+            let meta: { title: string; duration: number | null; channel: string | null } = {
+              title: "video",
+              duration: null,
+              channel: null,
+            };
+            try {
+              const info = await getMetadata(url);
+              meta = {
+                title: info.title,
+                duration: info.duration,
+                channel: info.channel,
+              };
+            } catch {}
+            send({
+              phase: "done",
+              source: captions.source,
+              transcript: captions,
+              metadata: meta,
+            });
+            controller.close();
+            return;
+          }
+        }
+
+        // ============================================================
+        // Tier 2: Full pipeline (yt-dlp → ffmpeg → WhisperX streaming)
+        // ============================================================
         const { videoPath, metadata } = await downloadVideo({
           url,
           onProgress: (p) =>
@@ -81,19 +120,29 @@ export async function POST(req: NextRequest) {
             }),
         });
 
-        // 2. Extract audio
         send({ phase: "extract" });
         const audioPath = await extractAudioForWhisper(videoPath);
 
-        // 3. Transcribe
         send({ phase: "transcribe" });
+        let totalDuration = 0;
         const result = await transcribe({
           audioPath,
+          onMeta: (m) => {
+            totalDuration = m.duration;
+            send({
+              phase: "transcribe-meta",
+              duration: m.duration,
+              language: m.language,
+              model: m.model,
+            });
+          },
+          onSegment: (seg) => {
+            const progress =
+              totalDuration > 0 ? Math.min(1, seg.end / totalDuration) : 0;
+            send({ phase: "segment", segment: seg, progress });
+          },
+          onAlignStart: () => send({ phase: "align" }),
           onStderrLine: (line) => {
-            // Forward high-signal progress lines:
-            //   - our own "Loading model / Transcribing / Aligning / Done" markers
-            //   - HuggingFace download progress (any line with %| or MB/s)
-            //   - tqdm-style progress bars
             if (
               /Loading model|Loading audio|Transcribing|Aligning|Done/i.test(line) ||
               /\d+%\s*\|/.test(line) ||
@@ -107,14 +156,13 @@ export async function POST(req: NextRequest) {
 
         send({
           phase: "done",
+          source: "whisperx",
           transcript: result,
           metadata: {
             title: metadata.title,
             duration: metadata.duration,
             channel: metadata.channel,
           },
-          videoPath,
-          audioPath,
         });
       } catch (err) {
         const e = err as Error & {

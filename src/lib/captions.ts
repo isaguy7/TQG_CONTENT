@@ -1,0 +1,217 @@
+import "server-only";
+
+import { spawn } from "node:child_process";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import type { WhisperResult, WhisperSegment } from "@/lib/transcript";
+
+const YTDLP_BIN = process.env.YTDLP_BIN || "yt-dlp";
+const PYTHON_BIN =
+  process.env.PYTHON_BIN || (process.platform === "win32" ? "python" : "python3");
+
+function resolveCommand(args: string[]): { cmd: string; fullArgs: string[] } {
+  const usePython =
+    process.env.YTDLP_USE_PYTHON === "1" ||
+    YTDLP_BIN.trim().toLowerCase() === "python -m yt_dlp";
+  if (usePython) {
+    return { cmd: PYTHON_BIN, fullArgs: ["-m", "yt_dlp", ...args] };
+  }
+  return { cmd: YTDLP_BIN, fullArgs: args };
+}
+
+export type CaptionResult = WhisperResult & {
+  source: "youtube-manual" | "youtube-auto";
+};
+
+/**
+ * Attempt to fetch YouTube's auto-captions or manually-uploaded subtitles
+ * via yt-dlp. Returns null if no captions are available. Prefers manual
+ * captions over auto-generated. Language preference order: en, then first
+ * available.
+ *
+ * Fast path for the drafting workflow: ~2-5s vs ~30-60s for WhisperX.
+ */
+export async function fetchYoutubeCaptions(
+  url: string,
+  language: string = "en"
+): Promise<CaptionResult | null> {
+  const workDir = await mkdtemp(path.join(tmpdir(), "tqg-captions-"));
+
+  try {
+    const args = [
+      "--skip-download",
+      "--write-subs",
+      "--write-auto-subs",
+      "--sub-langs",
+      `${language}.*,${language}`,
+      "--sub-format",
+      "vtt",
+      "--convert-subs",
+      "vtt",
+      "--no-warnings",
+      "-o",
+      path.join(workDir, "sub.%(ext)s"),
+      url,
+    ];
+
+    const { code, stderr } = await runYtdlp(args);
+
+    // yt-dlp exits 0 even if no subs are found (it just prints "No subtitles")
+    if (code !== 0) {
+      // Don't throw — captions are a best-effort fast path.
+      return null;
+    }
+
+    // Find the VTT file. Preference: manual > auto.
+    const files = await readdir(workDir);
+    const vttFiles = files.filter((f) => f.endsWith(".vtt"));
+    if (vttFiles.length === 0) return null;
+
+    // yt-dlp names them sub.en.vtt (manual) or sub.en.auto.vtt style.
+    // Detect auto via filename hint; fallback to any VTT.
+    const manual = vttFiles.find(
+      (f) => !/\.auto\.|-auto\.|\.orig\./i.test(f)
+    );
+    const picked = manual || vttFiles[0];
+    const isAuto = !manual;
+
+    const vttPath = path.join(workDir, picked);
+    const vttText = await readFile(vttPath, "utf-8");
+    const segments = parseVtt(vttText);
+
+    if (segments.length === 0) return null;
+
+    return {
+      language,
+      segments,
+      model: isAuto ? "youtube-auto-captions" : "youtube-manual-captions",
+      aligned: false,
+      source: isAuto ? "youtube-auto" : "youtube-manual",
+    };
+  } catch {
+    return null;
+  } finally {
+    await rm(workDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+function runYtdlp(args: string[]): Promise<{ code: number; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const { cmd, fullArgs } = resolveCommand(args);
+    const child = spawn(cmd, fullArgs, { shell: false });
+    let stderr = "";
+    child.stderr.setEncoding("utf-8");
+    child.stderr.on("data", (c: string) => (stderr += c));
+    child.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "ENOENT") {
+        reject(
+          new Error(
+            `yt-dlp not found (tried '${cmd}'). Set YTDLP_USE_PYTHON=1 in .env.local`
+          )
+        );
+        return;
+      }
+      reject(err);
+    });
+    child.on("close", (code) => resolve({ code: code ?? 1, stderr }));
+  });
+}
+
+/**
+ * Minimal VTT parser. Handles the common YouTube format:
+ *
+ *   WEBVTT
+ *
+ *   00:00:00.000 --> 00:00:03.500
+ *   Hello and welcome.
+ *
+ *   00:00:03.500 --> 00:00:07.200
+ *   Today we're talking about...
+ *
+ * Also strips YouTube auto-sub inline word-timing tags like
+ *   <00:00:01.200><c>word</c>
+ * since we only want segment-level text here.
+ */
+export function parseVtt(vtt: string): WhisperSegment[] {
+  const lines = vtt.replace(/\r\n/g, "\n").split("\n");
+  const segments: WhisperSegment[] = [];
+
+  let i = 0;
+  // Skip header block
+  while (i < lines.length && !/-->/.test(lines[i])) i++;
+
+  const timeRe = /(\d\d):(\d\d):(\d\d)[.,](\d{3})\s*-->\s*(\d\d):(\d\d):(\d\d)[.,](\d{3})/;
+
+  const seen = new Set<string>();
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const m = line.match(timeRe);
+    if (!m) {
+      i++;
+      continue;
+    }
+    const start =
+      parseInt(m[1]) * 3600 + parseInt(m[2]) * 60 + parseInt(m[3]) + parseInt(m[4]) / 1000;
+    const end =
+      parseInt(m[5]) * 3600 + parseInt(m[6]) * 60 + parseInt(m[7]) + parseInt(m[8]) / 1000;
+    i++;
+
+    const textLines: string[] = [];
+    while (i < lines.length && lines[i].trim() !== "" && !timeRe.test(lines[i])) {
+      textLines.push(lines[i]);
+      i++;
+    }
+
+    const text = cleanVttText(textLines.join(" ")).trim();
+    if (!text) continue;
+
+    // Dedup: YouTube auto-subs emit overlapping repeating cues.
+    const key = `${start.toFixed(2)}|${text}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    segments.push({ start, end, text });
+  }
+
+  return mergeAdjacent(segments);
+}
+
+function cleanVttText(s: string): string {
+  return s
+    // Strip inline timing tags: <00:00:01.200>
+    .replace(/<\d\d:\d\d:\d\d\.\d{3}>/g, "")
+    // Strip colour/class markup: <c>, </c>, <c.colorE5E5E5>
+    .replace(/<\/?c[^>]*>/g, "")
+    // Strip voice markup: <v Speaker>
+    .replace(/<v[^>]*>/g, "")
+    // Strip any other angle-bracket tags
+    .replace(/<[^>]+>/g, "")
+    // Common HTML entities
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, " ");
+}
+
+/**
+ * YouTube auto-subs emit many small overlapping cues. Merge segments
+ * whose text starts with the previous segment's text (rolling captions)
+ * by keeping the longest version.
+ */
+function mergeAdjacent(segments: WhisperSegment[]): WhisperSegment[] {
+  const out: WhisperSegment[] = [];
+  for (const s of segments) {
+    const prev = out[out.length - 1];
+    if (prev && s.text.startsWith(prev.text)) {
+      // Replace prev with the longer rolling version
+      out[out.length - 1] = { start: prev.start, end: s.end, text: s.text };
+    } else {
+      out.push(s);
+    }
+  }
+  return out;
+}

@@ -1,24 +1,20 @@
 #!/usr/bin/env python3
 """
-TQG Content Studio — WhisperX transcription runner.
+TQG Content Studio — WhisperX transcription runner (streaming).
 
-Called by lib/whisper.ts as a subprocess. Writes structured JSON to an
-output file (never stdout) so the Node wrapper reads it after process
-exit rather than parsing a noisy stream.
+Streams segments to stderr as they're decoded so the Node wrapper can
+forward them to the client in real time. Each decoded segment is
+emitted as a marker line:
 
-Usage:
-    python transcribe.py \
-        --audio path/to/audio.wav \
-        --output path/to/result.json \
-        --model large-v3 \
-        --device cuda \
-        --compute-type float16 \
-        --batch-size 16 \
-        --language auto
+    TQG_META:{"duration": 123.45, "language": "en"}
+    TQG_SEGMENT:{"start": 0.0, "end": 3.2, "text": "..."}
+    TQG_SEGMENT:{"start": 3.2, "end": 6.7, "text": "..."}
+    ...
+    TQG_ALIGN_START
+    TQG_DONE
 
-On success: exits 0, result.json contains { "segments": [...], "language": "..." }
-On failure: exits 1, writes { "error": str, "traceback": str } to result.json
-            (stderr is also captured by the Node wrapper for diagnostics).
+On success, writes the final aligned payload to --output and exits 0.
+On failure, writes {"error", "traceback"} to --output and exits 1.
 """
 from __future__ import annotations
 
@@ -29,6 +25,13 @@ import traceback
 from pathlib import Path
 
 
+def emit(tag: str, data=None) -> None:
+    if data is None:
+        print(tag, file=sys.stderr, flush=True)
+    else:
+        print(f"{tag}:{json.dumps(data, ensure_ascii=False)}", file=sys.stderr, flush=True)
+
+
 def write_error(output_path: Path, exc: BaseException) -> None:
     payload = {
         "error": f"{type(exc).__name__}: {exc}",
@@ -37,28 +40,19 @@ def write_error(output_path: Path, exc: BaseException) -> None:
     try:
         output_path.write_text(json.dumps(payload), encoding="utf-8")
     except Exception:
-        # Last resort: dump to stderr. Node wrapper keeps last 20 lines.
         print(json.dumps(payload), file=sys.stderr, flush=True)
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="WhisperX transcribe runner")
-    parser.add_argument("--audio", required=True, help="Path to input audio (wav)")
-    parser.add_argument("--output", required=True, help="Path to JSON output")
-    parser.add_argument("--model", default="large-v3")
+    parser = argparse.ArgumentParser(description="WhisperX streaming transcribe runner")
+    parser.add_argument("--audio", required=True)
+    parser.add_argument("--output", required=True)
+    parser.add_argument("--model", default="large-v3-turbo")
     parser.add_argument("--device", default="cuda")
-    parser.add_argument("--compute-type", default="float16")
-    parser.add_argument("--batch-size", type=int, default=16)
-    parser.add_argument(
-        "--language",
-        default="auto",
-        help="Language code (en/ar/...) or 'auto' to detect",
-    )
-    parser.add_argument(
-        "--no-align",
-        action="store_true",
-        help="Skip wav2vec2 forced alignment (faster, no word timestamps)",
-    )
+    parser.add_argument("--compute-type", default="int8_float16")
+    parser.add_argument("--batch-size", type=int, default=4)
+    parser.add_argument("--language", default="auto")
+    parser.add_argument("--no-align", action="store_true")
     args = parser.parse_args()
 
     audio_path = Path(args.audio)
@@ -69,65 +63,100 @@ def main() -> int:
         return 1
 
     try:
-        # Import lazily so --help doesn't require CUDA/torch to be installed
-        import whisperx  # type: ignore
+        from faster_whisper import WhisperModel  # type: ignore
 
         print(f"Loading model: {args.model} on {args.device}", file=sys.stderr, flush=True)
-        model = whisperx.load_model(
+        model = WhisperModel(
             args.model,
             device=args.device,
             compute_type=args.compute_type,
         )
 
         print(f"Loading audio: {audio_path}", file=sys.stderr, flush=True)
-        audio = whisperx.load_audio(str(audio_path))
-
         lang = None if args.language == "auto" else args.language
-        print("Transcribing...", file=sys.stderr, flush=True)
-        result = model.transcribe(
-            audio,
-            batch_size=args.batch_size,
-            language=lang,
-        )
-        detected_language = result.get("language") or lang or "unknown"
 
-        # Forced alignment for word-level timestamps.
+        # Stream segments as they're decoded. faster-whisper returns a generator
+        # that yields Segment objects lazily; iterating drives decoding.
+        segments_iter, info = model.transcribe(
+            str(audio_path),
+            language=lang,
+            beam_size=5,
+            vad_filter=True,
+            vad_parameters={"min_silence_duration_ms": 500},
+        )
+
+        detected_language = info.language or lang or "unknown"
+        total_duration = float(info.duration) if info.duration else 0.0
+
+        emit(
+            "TQG_META",
+            {
+                "duration": total_duration,
+                "language": detected_language,
+                "model": args.model,
+            },
+        )
+
+        all_segments = []
+        for seg in segments_iter:
+            seg_dict = {
+                "start": float(seg.start),
+                "end": float(seg.end),
+                "text": seg.text,
+            }
+            all_segments.append(seg_dict)
+            emit("TQG_SEGMENT", seg_dict)
+
+        if not all_segments:
+            emit("TQG_DONE")
+            payload = {
+                "language": detected_language,
+                "segments": [],
+                "model": args.model,
+                "aligned": False,
+            }
+            output_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+            return 0
+
+        # Word-level alignment via WhisperX.
         if not args.no_align:
+            emit("TQG_ALIGN_START")
             try:
-                print(
-                    f"Aligning (language={detected_language})...",
-                    file=sys.stderr,
-                    flush=True,
-                )
+                import whisperx  # type: ignore
+
+                audio = whisperx.load_audio(str(audio_path))
                 align_model, align_metadata = whisperx.load_align_model(
                     language_code=detected_language,
                     device=args.device,
                 )
-                result = whisperx.align(
-                    result["segments"],
+                aligned = whisperx.align(
+                    all_segments,
                     align_model,
                     align_metadata,
                     audio,
                     device=args.device,
                     return_char_alignments=False,
                 )
+                all_segments = aligned.get("segments", all_segments)
+                aligned_flag = True
             except Exception as align_err:  # noqa: BLE001
-                # Alignment can fail for rare languages or short clips.
-                # Keep segment-level transcript; note the failure.
                 print(
                     f"Alignment failed ({align_err}); returning segment-level only",
                     file=sys.stderr,
                     flush=True,
                 )
+                aligned_flag = False
+        else:
+            aligned_flag = False
 
         payload = {
             "language": detected_language,
-            "segments": result.get("segments", []),
+            "segments": all_segments,
             "model": args.model,
-            "aligned": not args.no_align,
+            "aligned": aligned_flag,
         }
         output_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-        print("Done.", file=sys.stderr, flush=True)
+        emit("TQG_DONE")
         return 0
     except BaseException as exc:  # noqa: BLE001
         write_error(output_path, exc)

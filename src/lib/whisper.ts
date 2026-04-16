@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { WhisperResult } from "@/lib/transcript";
+import type { WhisperResult, WhisperSegment } from "@/lib/transcript";
 
 export type { WhisperResult, WhisperSegment, WhisperWord } from "@/lib/transcript";
 
@@ -12,13 +12,8 @@ const PYTHON_BIN =
   process.env.PYTHON_BIN || (process.platform === "win32" ? "python" : "python3");
 const WHISPERX_MODEL = process.env.WHISPERX_MODEL || "large-v3-turbo";
 const WHISPERX_DEVICE = process.env.WHISPERX_DEVICE || "cuda";
-// int8_float16 fits large-v3 comfortably on 8GB VRAM. Bump to float16 for
-// 16GB+ cards for ~5% accuracy improvement. On a 24GB card you can use
-// float16 + batch 16 without thinking about it.
 const WHISPERX_COMPUTE_TYPE = process.env.WHISPERX_COMPUTE_TYPE || "int8_float16";
-const WHISPERX_BATCH_SIZE = process.env.WHISPERX_BATCH_SIZE || "2";
-// 0 = no timeout. Default 6h — plenty of headroom for multi-hour lectures
-// on the 4090. Override via WHISPERX_TIMEOUT_MS (milliseconds, 0 to disable).
+const WHISPERX_BATCH_SIZE = process.env.WHISPERX_BATCH_SIZE || "4";
 const TRANSCRIBE_TIMEOUT_MS = parseInt(
   process.env.WHISPERX_TIMEOUT_MS || String(6 * 60 * 60 * 1000),
   10
@@ -30,23 +25,46 @@ export type WhisperError = {
   traceback?: string;
 };
 
+export type TranscribeMeta = {
+  duration: number;
+  language: string;
+  model: string;
+};
+
 export type TranscribeOptions = {
   audioPath: string;
   language?: string;
   onStderrLine?: (line: string) => void;
+  onMeta?: (meta: TranscribeMeta) => void;
+  onSegment?: (segment: WhisperSegment) => void;
+  onAlignStart?: () => void;
 };
 
 /**
- * Run scripts/transcribe.py as a subprocess. Writes output to a temp JSON
- * file (never stdout) so we only parse after process exit. Captures the
- * last 20 lines of stderr for error surfaces.
+ * Run scripts/transcribe.py as a subprocess with streaming output.
+ *
+ * The Python side emits marker lines to stderr:
+ *   TQG_META:{"duration":..,"language":"..","model":".."}
+ *   TQG_SEGMENT:{"start":..,"end":..,"text":".."}
+ *   TQG_ALIGN_START
+ *   TQG_DONE
+ *
+ * Plus free-form informational lines. All marker lines are removed
+ * before the non-marker line is handed to onStderrLine (for progress
+ * panels) so the UI doesn't see our internal protocol.
  */
 export async function transcribe(opts: TranscribeOptions): Promise<WhisperResult> {
-  const { audioPath, language = "auto", onStderrLine } = opts;
+  const {
+    audioPath,
+    language = "auto",
+    onStderrLine,
+    onMeta,
+    onSegment,
+    onAlignStart,
+  } = opts;
 
   const workDir = await mkdtemp(path.join(tmpdir(), "tqg-whisper-"));
   const outputPath = path.join(workDir, "result.json");
-
   const scriptPath = path.join(process.cwd(), "scripts", "transcribe.py");
 
   const args = [
@@ -98,7 +116,30 @@ export async function transcribe(opts: TranscribeOptions): Promise<WhisperResult
       child.stderr.on("data", (chunk: string) => {
         stderrBuf += chunk;
         for (const line of chunk.split(/\r?\n/)) {
-          if (line && onStderrLine) onStderrLine(line);
+          if (!line) continue;
+          // Parse our marker protocol first.
+          if (line.startsWith("TQG_META:")) {
+            try {
+              const meta = JSON.parse(line.slice("TQG_META:".length));
+              onMeta?.(meta);
+            } catch {}
+            continue;
+          }
+          if (line.startsWith("TQG_SEGMENT:")) {
+            try {
+              const seg = JSON.parse(line.slice("TQG_SEGMENT:".length));
+              onSegment?.(seg);
+            } catch {}
+            continue;
+          }
+          if (line === "TQG_ALIGN_START") {
+            onAlignStart?.();
+            continue;
+          }
+          if (line === "TQG_DONE") {
+            continue;
+          }
+          onStderrLine?.(line);
         }
       });
 
