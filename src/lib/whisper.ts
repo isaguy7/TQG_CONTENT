@@ -12,8 +12,11 @@ const PYTHON_BIN =
   process.env.PYTHON_BIN || (process.platform === "win32" ? "python" : "python3");
 const WHISPERX_MODEL = process.env.WHISPERX_MODEL || "large-v3";
 const WHISPERX_DEVICE = process.env.WHISPERX_DEVICE || "cuda";
-const WHISPERX_COMPUTE_TYPE = process.env.WHISPERX_COMPUTE_TYPE || "float16";
-const WHISPERX_BATCH_SIZE = process.env.WHISPERX_BATCH_SIZE || "16";
+// int8_float16 fits large-v3 comfortably on 8GB VRAM. Bump to float16 for
+// 16GB+ cards for ~5% accuracy improvement. On a 24GB card you can use
+// float16 + batch 16 without thinking about it.
+const WHISPERX_COMPUTE_TYPE = process.env.WHISPERX_COMPUTE_TYPE || "int8_float16";
+const WHISPERX_BATCH_SIZE = process.env.WHISPERX_BATCH_SIZE || "4";
 // 0 = no timeout. Default 6h — plenty of headroom for multi-hour lectures
 // on the 4090. Override via WHISPERX_TIMEOUT_MS (milliseconds, 0 to disable).
 const TRANSCRIBE_TIMEOUT_MS = parseInt(
