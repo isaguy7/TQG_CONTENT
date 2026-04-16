@@ -66,9 +66,12 @@ export async function POST(req: NextRequest) {
   const abortController = new AbortController();
   const { signal } = abortController;
 
-  // Hook up client disconnects too — when the browser drops the fetch,
-  // Next surfaces that via req.signal. Kill subprocesses immediately.
-  req.signal.addEventListener("abort", () => abortController.abort(), {
+  const onAbort = (source: string) => {
+    console.log(`[transcribe] Abort received from ${source}; killing subprocesses`);
+    abortController.abort();
+  };
+
+  req.signal.addEventListener("abort", () => onAbort("req.signal"), {
     once: true,
   });
 
@@ -192,8 +195,7 @@ export async function POST(req: NextRequest) {
       }
     },
     cancel() {
-      // Client disconnected or explicitly cancelled — kill all subprocesses.
-      abortController.abort();
+      onAbort("ReadableStream.cancel");
     },
   });
 

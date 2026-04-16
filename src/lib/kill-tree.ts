@@ -17,19 +17,26 @@ import type { ChildProcess } from "node:child_process";
  */
 export function killTree(child: ChildProcess): void {
   const pid = child.pid;
-  if (!pid) return;
+  if (!pid) {
+    console.log("[killTree] child has no pid; cannot kill tree");
+    return;
+  }
 
   if (process.platform === "win32") {
+    console.log(`[killTree] taskkill /PID ${pid} /T /F`);
     try {
-      execFile("taskkill", ["/PID", String(pid), "/T", "/F"], (err) => {
+      execFile("taskkill", ["/PID", String(pid), "/T", "/F"], (err, stdout, stderr) => {
         if (err) {
-          // Fall back to Node's kill if taskkill failed (PID already gone, etc).
+          console.log(`[killTree] taskkill failed (${err.message}); falling back`);
           try {
             child.kill("SIGKILL");
           } catch {}
+        } else {
+          console.log(`[killTree] taskkill ok: ${stdout.trim()}`);
         }
       });
-    } catch {
+    } catch (err) {
+      console.log(`[killTree] taskkill threw: ${(err as Error).message}`);
       try {
         child.kill("SIGKILL");
       } catch {}

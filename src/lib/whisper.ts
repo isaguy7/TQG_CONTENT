@@ -15,6 +15,11 @@ const WHISPERX_MODEL = process.env.WHISPERX_MODEL || "large-v3-turbo";
 const WHISPERX_DEVICE = process.env.WHISPERX_DEVICE || "cuda";
 const WHISPERX_COMPUTE_TYPE = process.env.WHISPERX_COMPUTE_TYPE || "int8_float16";
 const WHISPERX_BATCH_SIZE = process.env.WHISPERX_BATCH_SIZE || "4";
+// Word-level alignment is needed for Phase 5 (Quran clip overlays) but
+// only adds time to simple post-drafting transcription. Off by default.
+// Set WHISPERX_ALIGN=1 in .env.local to re-enable globally, or pass
+// { align: true } per-call.
+const WHISPERX_ALIGN_DEFAULT = process.env.WHISPERX_ALIGN === "1";
 const TRANSCRIBE_TIMEOUT_MS = parseInt(
   process.env.WHISPERX_TIMEOUT_MS || String(6 * 60 * 60 * 1000),
   10
@@ -35,6 +40,7 @@ export type TranscribeMeta = {
 export type TranscribeOptions = {
   audioPath: string;
   language?: string;
+  align?: boolean; // word-level alignment; defaults to WHISPERX_ALIGN env (off)
   signal?: AbortSignal;
   onStderrLine?: (line: string) => void;
   onMeta?: (meta: TranscribeMeta) => void;
@@ -59,6 +65,7 @@ export async function transcribe(opts: TranscribeOptions): Promise<WhisperResult
   const {
     audioPath,
     language = "auto",
+    align = WHISPERX_ALIGN_DEFAULT,
     signal,
     onStderrLine,
     onMeta,
@@ -87,6 +94,7 @@ export async function transcribe(opts: TranscribeOptions): Promise<WhisperResult
     "--language",
     language,
   ];
+  if (!align) args.push("--no-align");
 
   let stderrBuf = "";
 
