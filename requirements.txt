@@ -3,15 +3,13 @@
 
 # Video download. Breaks roughly monthly when YouTube changes.
 # Upgrade via Settings → "Upgrade yt-dlp" button (pip install --upgrade yt-dlp)
-yt-dlp==2026.3.31
+yt-dlp>=2026.3.0
 
-# WhisperX — transcription + word-level alignment via wav2vec2
-# Requires CUDA 12.x + cuDNN + PyTorch with CUDA support
-whisperx==3.4.3
+# WhisperX — transcription + word-level alignment via wav2vec2.
+# IMPORTANT: install a CUDA-enabled PyTorch FIRST (see README).
+# The default `pip install torch` pulls the CPU build, which will fail
+# at runtime on an RTX 4090 with "Torch not compiled with CUDA enabled".
+whisperx>=3.1
 
-# Faster backend for whisper inference (used by whisperx internally)
-faster-whisper>=1.1.0
-
-# Torch is pulled in by whisperx; if you need to pin for your CUDA version,
-# install torch explicitly first per pytorch.org instructions, then run
-# `pip install -r requirements.txt` with torch already satisfied.
+# Faster backend used internally by whisperx.
+faster-whisper>=1.0.0
