@@ -14,6 +14,7 @@ type Source = "youtube-auto" | "youtube-manual" | "whisperx";
 type Event =
   | { phase: "start"; url: string }
   | { phase: "captions-try" }
+  | { phase: "captions-not-found"; reason?: string }
   | {
       phase: "download";
       percent: number | null;
@@ -113,6 +114,14 @@ export async function POST(req: NextRequest) {
             });
             return;
           }
+          // Captions not available — surface to the client and stop here.
+          // Client shows a 'Try WhisperX (GPU)?' prompt and resubmits with
+          // forceWhisper=true if the user agrees.
+          send({
+            phase: "captions-not-found",
+            reason: "yt-dlp returned no English captions for this URL",
+          });
+          return;
         }
 
         const { videoPath, metadata } = await downloadVideo({

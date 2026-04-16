@@ -12,6 +12,7 @@ type Phase =
   | { kind: "idle" }
   | { kind: "start" }
   | { kind: "captions" }
+  | { kind: "captions-not-found"; reason?: string }
   | {
       kind: "download";
       percent: number | null;
@@ -43,6 +44,7 @@ type Phase =
 type ServerEvent =
   | { phase: "start"; url: string }
   | { phase: "captions-try" }
+  | { phase: "captions-not-found"; reason?: string }
   | {
       phase: "download";
       percent: number | null;
@@ -99,11 +101,8 @@ export function TranscribeWorkflow() {
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const abortRef = useRef<AbortController | null>(null);
 
-  const handleSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!url.trim()) return;
-
+  const runTranscribe = useCallback(
+    async (targetUrl: string, force: boolean) => {
       abortRef.current = new AbortController();
       setPhase({ kind: "start" });
 
@@ -111,7 +110,7 @@ export function TranscribeWorkflow() {
         const res = await fetch("/api/transcribe", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: url.trim(), forceWhisper }),
+          body: JSON.stringify({ url: targetUrl, forceWhisper: force }),
           signal: abortRef.current.signal,
         });
 
@@ -148,14 +147,28 @@ export function TranscribeWorkflow() {
         setPhase({ kind: "error", message: e.message });
       }
     },
-    [url, forceWhisper]
+    []
   );
+
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!url.trim()) return;
+      runTranscribe(url.trim(), forceWhisper);
+    },
+    [url, forceWhisper, runTranscribe]
+  );
+
+  const handleRetryWithWhisper = useCallback(() => {
+    if (!url.trim()) return;
+    runTranscribe(url.trim(), true);
+  }, [url, runTranscribe]);
 
   const handleAbort = useCallback(() => {
     abortRef.current?.abort();
   }, []);
 
-  const busy = phase.kind !== "idle" && phase.kind !== "done" && phase.kind !== "error";
+  const busy = phase.kind !== "idle" && phase.kind !== "done" && phase.kind !== "error" && phase.kind !== "captions-not-found";
 
   return (
     <div className="space-y-4">
@@ -207,6 +220,14 @@ export function TranscribeWorkflow() {
 
       <PhaseStatus phase={phase} />
 
+      {phase.kind === "captions-not-found" ? (
+        <CaptionsNotFoundPanel
+          reason={phase.reason}
+          onUseWhisper={handleRetryWithWhisper}
+          onCancel={() => setPhase({ kind: "idle" })}
+        />
+      ) : null}
+
       {phase.kind === "done" ? (
         <>
           <TranscriptResultPanel phase={phase} />
@@ -223,6 +244,8 @@ function reducePhase(prev: Phase, ev: ServerEvent): Phase {
   switch (ev.phase) {
     case "start":
       return { kind: "start" };
+    case "captions-not-found":
+      return { kind: "captions-not-found", reason: ev.reason };
     case "captions-try":
       return { kind: "captions" };
     case "download":
@@ -306,6 +329,43 @@ function reducePhase(prev: Phase, ev: ServerEvent): Phase {
         traceback: ev.traceback,
       };
   }
+}
+
+function CaptionsNotFoundPanel({
+  reason,
+  onUseWhisper,
+  onCancel,
+}: {
+  reason?: string;
+  onUseWhisper: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="rounded-lg bg-warning/[0.06] border border-warning/40 p-4">
+      <div className="text-[13px] text-white/90 font-medium mb-1">
+        No YouTube captions found
+      </div>
+      <div className="text-[12px] text-white/60 mb-3">
+        {reason || "yt-dlp couldn't fetch subtitles for this video."} Transcribe
+        with WhisperX on your GPU instead? That'll download the video and run
+        through large-v3-turbo on your 4060 Ti.
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={onUseWhisper}
+          className="px-3 py-1.5 rounded text-[12px] font-medium bg-primary text-primary-foreground hover:bg-primary-hover"
+        >
+          Yes, use WhisperX (GPU)
+        </button>
+        <button
+          onClick={onCancel}
+          className="px-3 py-1.5 rounded text-[12px] border border-white/[0.08] text-white/70 hover:text-white hover:bg-white/[0.04]"
+        >
+          No, cancel
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function PhaseStatus({ phase }: { phase: Phase }) {

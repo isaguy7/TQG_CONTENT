@@ -39,7 +39,10 @@ export async function fetchYoutubeCaptions(
   signal?: AbortSignal
 ): Promise<CaptionResult | null> {
   const workDir = await mkdtemp(path.join(tmpdir(), "tqg-captions-"));
-  const debug = process.env.TQG_CAPTIONS_DEBUG === "1";
+  // Debug is on by default in dev; opt-in via env in prod.
+  const debug =
+    process.env.TQG_CAPTIONS_DEBUG === "1" ||
+    process.env.NODE_ENV === "development";
   const log = (msg: string) => {
     if (debug) console.log(`[captions] ${msg}`);
   };
