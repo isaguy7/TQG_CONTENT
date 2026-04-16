@@ -90,9 +90,15 @@ export async function POST(req: NextRequest) {
         const result = await transcribe({
           audioPath,
           onStderrLine: (line) => {
-            // Surface high-signal WhisperX progress lines.
+            // Forward high-signal progress lines:
+            //   - our own "Loading model / Transcribing / Aligning / Done" markers
+            //   - HuggingFace download progress (any line with %| or MB/s)
+            //   - tqdm-style progress bars
             if (
-              /Loading model|Loading audio|Transcribing|Aligning|Done/i.test(line)
+              /Loading model|Loading audio|Transcribing|Aligning|Done/i.test(line) ||
+              /\d+%\s*\|/.test(line) ||
+              /\d+(\.\d+)?\s*(MB|GB|KB)\/s/.test(line) ||
+              /Downloading|Fetching|Resolving/i.test(line)
             ) {
               send({ phase: "transcribe", line });
             }
