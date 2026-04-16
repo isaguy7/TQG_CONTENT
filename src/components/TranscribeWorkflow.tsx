@@ -201,7 +201,12 @@ export function TranscribeWorkflow() {
   return (
     <div className="space-y-4">
       <form
-        onSubmit={handleSubmit}
+        onSubmit={(e) => {
+          e.preventDefault();
+          // Form submit from Enter key in the URL input. If we're already
+          // busy, do nothing — only the button click cancels.
+          if (!busy && url.trim()) runTranscribe(url.trim(), forceWhisper);
+        }}
         className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4"
       >
         <label className="section-label block mb-2">
@@ -216,23 +221,33 @@ export function TranscribeWorkflow() {
             disabled={busy}
             className="flex-1 bg-white/[0.03] border border-white/[0.08] rounded-md px-3 py-2 text-[13px] text-white/90 placeholder-white/25 focus:outline-none focus:border-primary-hover/50 font-mono"
           />
-          {busy ? (
-            <button
-              type="button"
-              onClick={handleAbort}
-              className="px-4 py-2 rounded-md text-[13px] border border-white/[0.08] text-white/70 hover:text-white hover:bg-white/[0.04]"
-            >
-              Cancel
-            </button>
-          ) : (
-            <button
-              type="submit"
-              disabled={!url.trim()}
-              className="px-4 py-2 rounded-md text-[13px] font-medium bg-primary text-primary-foreground hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Transcribe
-            </button>
-          )}
+          {/*
+            Single stable button element. Using one element instead of
+            swapping between two prevents a React re-render during the
+            mousedown→mouseup window from routing the click to the wrong
+            replacement button (which would fire Transcribe when the user
+            intended Cancel).
+          */}
+          <button
+            key="transcribe-action"
+            type="button"
+            onClick={() => {
+              if (busy) {
+                handleAbort();
+              } else if (url.trim()) {
+                runTranscribe(url.trim(), forceWhisper);
+              }
+            }}
+            disabled={!busy && !url.trim()}
+            className={cn(
+              "px-4 py-2 rounded-md text-[13px] transition-colors",
+              busy
+                ? "border border-white/[0.08] text-white/70 hover:text-white hover:bg-white/[0.04]"
+                : "font-medium bg-primary text-primary-foreground hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed"
+            )}
+          >
+            {busy ? "Cancel" : "Transcribe"}
+          </button>
         </div>
         <label className="mt-3 flex items-center gap-2 text-[12px] text-white/55 cursor-pointer select-none">
           <input
