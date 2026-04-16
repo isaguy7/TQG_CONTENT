@@ -103,7 +103,10 @@ export function TranscribeWorkflow() {
 
   const runTranscribe = useCallback(
     async (targetUrl: string, force: boolean) => {
-      abortRef.current = new AbortController();
+      // Abort any in-flight request from a previous click before starting.
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
       setPhase({ kind: "start" });
 
       try {
@@ -111,7 +114,7 @@ export function TranscribeWorkflow() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ url: targetUrl, forceWhisper: force }),
-          signal: abortRef.current.signal,
+          signal: controller.signal,
         });
 
         if (!res.body) throw new Error("No response stream");
@@ -121,12 +124,17 @@ export function TranscribeWorkflow() {
         let buffer = "";
 
         while (true) {
+          // If this controller was aborted, stop processing events —
+          // otherwise a buffered 'segment' or 'transcribe' event can
+          // overwrite the idle state set by handleAbort.
+          if (controller.signal.aborted) break;
           const { done, value } = await reader.read();
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
 
           let nl: number;
           while ((nl = buffer.indexOf("\n")) !== -1) {
+            if (controller.signal.aborted) break;
             const line = buffer.slice(0, nl);
             buffer = buffer.slice(nl + 1);
             if (!line.trim()) continue;
@@ -140,8 +148,8 @@ export function TranscribeWorkflow() {
         }
       } catch (err) {
         const e = err as Error;
-        if (e.name === "AbortError") {
-          setPhase({ kind: "idle" });
+        if (e.name === "AbortError" || controller.signal.aborted) {
+          // Explicit abort — stay idle.
           return;
         }
         setPhase({ kind: "error", message: e.message });
@@ -166,6 +174,9 @@ export function TranscribeWorkflow() {
 
   const handleAbort = useCallback(() => {
     abortRef.current?.abort();
+    // Immediately reset UI — don't wait for the catch block, don't let any
+    // buffered server event bring us back into transcribe/segment state.
+    setPhase({ kind: "idle" });
   }, []);
 
   const busy = phase.kind !== "idle" && phase.kind !== "done" && phase.kind !== "error" && phase.kind !== "captions-not-found";
