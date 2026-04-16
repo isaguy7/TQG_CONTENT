@@ -10,28 +10,26 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        surface: "hsl(var(--surface))",
+        "background-alt": "hsl(var(--background-alt))",
         sidebar: "hsl(var(--sidebar))",
+        foreground: "hsl(var(--foreground))",
+        "muted-foreground": "hsl(var(--muted-foreground))",
+        "muted-foreground-dim": "hsl(var(--muted-foreground-dim))",
         primary: {
           DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
           hover: "hsl(var(--primary-hover))",
+          foreground: "hsl(var(--primary-foreground))",
+          bright: "hsl(var(--primary-bright))",
+          soft: "hsl(var(--primary-soft))",
         },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
-        },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+        status: {
+          ready: "hsl(var(--status-ready))",
+          drafting: "hsl(var(--status-drafting))",
+          idea: "hsl(var(--status-idea))",
+          published: "hsl(var(--status-published))",
         },
         warning: "hsl(var(--warning))",
-        success: "hsl(var(--success))",
         danger: "hsl(var(--danger))",
       },
       fontFamily: {
@@ -40,9 +38,12 @@ const config: Config = {
         arabic: ["var(--font-amiri)", "Amiri", "serif"],
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        lg: "8px",
+        md: "6px",
+        sm: "5px",
+      },
+      fontSize: {
+        "2xs": ["10px", { lineHeight: "1.2" }],
       },
     },
   },

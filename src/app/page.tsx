@@ -1,100 +1,186 @@
 import { PageShell } from "@/components/PageShell";
+import { MetricCard } from "@/components/MetricCard";
+import { PlatformCard } from "@/components/PlatformCard";
+import { RecentPostsList, type RecentPost } from "@/components/RecentPostsList";
+import { WeeklyTargets, HookPerformance } from "@/components/WeeklyTargets";
+import { GapAlert } from "@/components/GapAlert";
 import Link from "next/link";
-import { FileText, Film, Video, Calendar as CalendarIcon } from "lucide-react";
 
-const quickCreate = [
-  { href: "/content/new", label: "New post", icon: FileText },
-  { href: "/clips/new", label: "New clip batch", icon: Film },
-  { href: "/video/new", label: "New video project", icon: Video },
+const recentPosts: RecentPost[] = [
+  {
+    id: "1",
+    title: "Every Quran on earth goes back to one man's decision",
+    date: "Apr 14",
+    platform: "LinkedIn",
+    impressions: 7196,
+    engagementRate: 4.8,
+    tier1: true,
+  },
+  {
+    id: "2",
+    title: "They feared his hands when he raised them",
+    date: "Apr 11",
+    platform: "LinkedIn",
+    impressions: 3120,
+    engagementRate: 3.9,
+    tier1: true,
+  },
+  {
+    id: "3",
+    title: "Khalid ibn al-Walid was one of the greatest commanders",
+    date: "Apr 9",
+    platform: "LinkedIn",
+    impressions: 542,
+    engagementRate: 1.2,
+    tier1: false,
+  },
+  {
+    id: "4",
+    title: "The Battle of Badr changed everything",
+    date: "Apr 6",
+    platform: "TQG Page",
+    impressions: 412,
+    engagementRate: 1.5,
+    tier1: false,
+  },
+  {
+    id: "5",
+    title: "Show me where the marketplace is",
+    date: "Apr 3",
+    platform: "LinkedIn",
+    impressions: 2034,
+    engagementRate: 3.4,
+    tier1: true,
+  },
 ];
 
-const phaseProgress = [
-  { phase: "Phase 0", name: "Scaffold + Supabase", status: "in-progress" },
-  { phase: "Phase 1", name: "Video download + transcription", status: "pending" },
-  { phase: "Phase 2", name: "Hadith verification kernel", status: "pending" },
-  { phase: "Phase 3", name: "Islamic figures MVP", status: "pending" },
-  { phase: "Phase 4", name: "Quran local corpus + matcher", status: "pending" },
-  { phase: "Phase 5", name: "Short-form clip batch creator", status: "pending" },
+const gapAlerts = [
+  "No X clip posted in the last 3 days — algorithm momentum cooling.",
+  "3 Sahabah posts in a row. Next post: surface a Prophet or scholar.",
+  "TQG Page has 0 posts this week (target: 3).",
 ];
 
 export default function DashboardPage() {
   return (
     <PageShell
       title="Dashboard"
-      description="Weekly content overview and quick actions"
+      description="Lifetime and weekly metrics across every platform"
     >
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <section className="lg:col-span-2 space-y-4">
-          <div className="rounded-lg border border-border bg-surface p-6">
-            <div className="flex items-center gap-2 mb-3">
-              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold">This week</h2>
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <MetricCard
+          label="Lifetime impressions"
+          value="142.8k"
+          hint="All platforms combined"
+        />
+        <MetricCard
+          label="Total followers"
+          value="2,453"
+          hint="LinkedIn + TQG + X + IG/FB"
+        />
+        <MetricCard
+          label="This week"
+          value="12.4k"
+          delta="+18.3%"
+          deltaDirection="up"
+          hint="Impressions vs last week"
+        />
+        <MetricCard
+          label="Engagement rate"
+          value="3.2%"
+          delta="+0.4%"
+          deltaDirection="up"
+          hint="7-day avg vs prior 7-day"
+        />
+      </section>
+
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <PlatformCard
+          platform="LinkedIn Personal"
+          handle="@isakhan"
+          followers="1,900"
+          metrics={[
+            { label: "Impressions", value: "8.4k" },
+            { label: "Clicks", value: "312" },
+            { label: "Engagement", value: "3.8%" },
+            { label: "Growth/wk", value: "+42" },
+          ]}
+        />
+        <PlatformCard
+          platform="TQG LinkedIn Page"
+          handle="The Quran Group"
+          followers="528"
+          metrics={[
+            { label: "Impressions", value: "2.1k" },
+            { label: "Clicks", value: "48" },
+            { label: "Engagement", value: "2.1%" },
+            { label: "Growth/wk", value: "+11" },
+          ]}
+        />
+        <PlatformCard
+          platform="X / TQG"
+          handle="@TheQuranGroup"
+          followers="13"
+          metrics={[
+            { label: "Impressions", value: "1.2k" },
+            { label: "Best tweet", value: "284" },
+            { label: "Mode", value: "Singles" },
+            { label: "Threads at", value: "1,000" },
+          ]}
+          footnote="Threads deferred until 1k followers. Daily single + image at 12pm BST."
+          footnoteTone="muted"
+        />
+        <PlatformCard
+          platform="Instagram / Facebook"
+          handle="Cross-posted Reels"
+          metrics={[
+            { label: "Reels posted", value: "4" },
+            { label: "Impressions", value: "708" },
+            { label: "Strategy", value: "Cross-post" },
+            { label: "Priority", value: "Low" },
+          ]}
+          footnote="Meta Business Suite scheduler."
+          footnoteTone="muted"
+        />
+      </section>
+
+      <section className="grid grid-cols-1 lg:grid-cols-5 gap-3">
+        <div className="lg:col-span-3">
+          <RecentPostsList posts={recentPosts} />
+        </div>
+        <div className="lg:col-span-2 space-y-3">
+          <WeeklyTargets
+            targets={[
+              { label: "LinkedIn originals", actual: 1, target: 2 },
+              { label: "TQG reposts", actual: 2, target: 3 },
+              { label: "X tweets", actual: 4, target: 7 },
+              { label: "X clips", actual: 0, target: 3 },
+              { label: "IG / FB Reels", actual: 0, target: 3 },
+            ]}
+          />
+          <HookPerformance tier1Avg={4117} tier2Avg={475} />
+          <GapAlert messages={gapAlerts} />
+          <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
+            <div className="section-label mb-3">Quick create</div>
+            <div className="space-y-1.5">
+              <QuickLink href="/content/new" label="New post" />
+              <QuickLink href="/clips/new" label="New clip batch" />
+              <QuickLink href="/video/new" label="New video project" />
             </div>
-            <p className="text-sm text-muted-foreground">
-              Calendar view lands in Phase 4 (deferred to v2). For now, manage
-              posts directly from the Content tab.
-            </p>
           </div>
-
-          <div className="rounded-lg border border-border bg-surface p-6">
-            <h2 className="text-sm font-semibold mb-4">Build progress</h2>
-            <ul className="space-y-2">
-              {phaseProgress.map((p) => (
-                <li
-                  key={p.phase}
-                  className="flex items-center justify-between text-sm"
-                >
-                  <span className="text-muted-foreground">
-                    <span className="text-foreground font-medium">
-                      {p.phase}
-                    </span>{" "}
-                    · {p.name}
-                  </span>
-                  <span
-                    className={
-                      p.status === "in-progress"
-                        ? "text-warning"
-                        : "text-muted-foreground"
-                    }
-                  >
-                    {p.status}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-
-        <aside className="space-y-4">
-          <div className="rounded-lg border border-border bg-surface p-6">
-            <h2 className="text-sm font-semibold mb-3">Quick create</h2>
-            <ul className="space-y-2">
-              {quickCreate.map(({ href, label, icon: Icon }) => (
-                <li key={href}>
-                  <Link
-                    href={href}
-                    className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <Icon className="h-4 w-4" />
-                    {label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="rounded-lg border border-border bg-surface p-6 text-xs text-muted-foreground space-y-2">
-            <p>
-              <span className="text-foreground font-medium">Target:</span> 2
-              LinkedIn originals + 3 TQG reposts per week.
-            </p>
-            <p>
-              <span className="text-foreground font-medium">X clips:</span>{" "}
-              daily at 8pm BST once Phase 5 ships.
-            </p>
-          </div>
-        </aside>
-      </div>
+        </div>
+      </section>
     </PageShell>
+  );
+}
+
+function QuickLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-white/[0.04] text-[13px] text-white/70 hover:text-white/90 transition-colors"
+    >
+      <span>{label}</span>
+      <span className="text-white/25">→</span>
+    </Link>
   );
 }

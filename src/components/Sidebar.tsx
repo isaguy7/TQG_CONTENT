@@ -2,43 +2,54 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  FileText,
-  Calendar,
-  Users,
-  Film,
-  Video,
-  BookCheck,
-  ArrowLeftRight,
-  Settings,
-} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const nav = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/content", label: "Content", icon: FileText },
-  { href: "/calendar", label: "Calendar", icon: Calendar },
-  { href: "/figures", label: "Figures", icon: Users },
-  { href: "/clips", label: "Clips", icon: Film },
-  { href: "/video", label: "Video", icon: Video },
-  { href: "/hadith", label: "Hadith", icon: BookCheck },
-  { href: "/convert", label: "Convert", icon: ArrowLeftRight },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/", label: "Dashboard" },
+  { href: "/content", label: "Content" },
+  { href: "/figures", label: "Figures" },
+  { href: "/clips", label: "Clips" },
+  { href: "/video", label: "Video" },
+  { href: "/hadith", label: "Hadith" },
+  { href: "/calendar", label: "Calendar" },
+  { href: "/convert", label: "Convert" },
+  { href: "/settings", label: "Settings" },
 ];
+
+type DraftStub = {
+  id: string;
+  title: string;
+  status: "idea" | "drafting" | "ready" | "published";
+  date: string;
+};
+
+const drafts: DraftStub[] = [
+  { id: "1", title: "Abdur Rahman ibn Auf — marketplace", status: "drafting", date: "Today" },
+  { id: "2", title: "Bilal's voice", status: "ready", date: "Yesterday" },
+  { id: "3", title: "Mus'ab in Madinah", status: "idea", date: "2d ago" },
+  { id: "4", title: "Salahuddin at Hattin", status: "published", date: "Apr 9" },
+];
+
+const statusBorder: Record<DraftStub["status"], string> = {
+  ready: "border-l-2 border-status-ready",
+  drafting: "border-l-2 border-status-drafting",
+  idea: "border-l-2 border-white/10",
+  published: "border-l-2 border-status-published",
+};
 
 export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-60 shrink-0 border-r border-border bg-sidebar flex flex-col">
-      <div className="h-14 flex items-center px-4 border-b border-border">
-        <span className="text-sm font-semibold tracking-tight">
+    <aside className="w-48 shrink-0 bg-sidebar border-r border-white/[0.06] flex flex-col">
+      <div className="h-12 flex items-center px-4 border-b border-white/[0.06]">
+        <span className="text-[13px] font-semibold tracking-tight text-white/90">
           TQG Studio
         </span>
       </div>
-      <nav className="flex-1 p-2 space-y-1">
-        {nav.map(({ href, label, icon: Icon }) => {
+
+      <nav className="pt-3 pb-4 px-2">
+        {nav.map(({ href, label }) => {
           const active =
             href === "/" ? pathname === "/" : pathname?.startsWith(href);
           return (
@@ -46,19 +57,40 @@ export function Sidebar() {
               key={href}
               href={href}
               className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
+                "block px-3 py-1.5 text-[13px] rounded transition-colors",
                 active
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  ? "bg-white/[0.04] text-white/90"
+                  : "text-white/55 hover:text-white/90 hover:bg-white/[0.02]"
               )}
             >
-              <Icon className="h-4 w-4" />
-              <span>{label}</span>
+              {label}
             </Link>
           );
         })}
       </nav>
-      <div className="p-3 border-t border-border text-xs text-muted-foreground">
+
+      <div className="px-4 pt-2 pb-1.5">
+        <span className="section-label">Drafts</span>
+      </div>
+      <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-1">
+        {drafts.map((d) => (
+          <Link
+            key={d.id}
+            href={`/content/${d.id}`}
+            className={cn(
+              "block pl-3 pr-2 py-1.5 rounded hover:bg-white/[0.03] transition-colors",
+              statusBorder[d.status]
+            )}
+          >
+            <div className="text-[12px] text-white/75 truncate leading-tight">
+              {d.title}
+            </div>
+            <div className="text-[10px] text-white/30 mt-0.5">{d.date}</div>
+          </Link>
+        ))}
+      </div>
+
+      <div className="px-4 py-2 border-t border-white/[0.06] text-[10px] text-white/30">
         v0.1 · Phase 0
       </div>
     </aside>
