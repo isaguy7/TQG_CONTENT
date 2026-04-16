@@ -30,7 +30,7 @@ type Event =
       videoPath: string;
       audioPath: string;
     }
-  | { phase: "error"; message: string; stderrTail?: string };
+  | { phase: "error"; message: string; stderrTail?: string; traceback?: string };
 
 function encodeLine(ev: Event): Uint8Array {
   return new TextEncoder().encode(JSON.stringify(ev) + "\n");
@@ -111,11 +111,14 @@ export async function POST(req: NextRequest) {
           audioPath,
         });
       } catch (err) {
-        const e = err as Error & { details?: { stderrTail?: string } };
+        const e = err as Error & {
+          details?: { stderrTail?: string; traceback?: string };
+        };
         send({
           phase: "error",
           message: e.message || "Unknown error",
           stderrTail: e.details?.stderrTail,
+          traceback: e.details?.traceback,
         });
       } finally {
         controller.close();

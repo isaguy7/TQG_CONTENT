@@ -13,7 +13,7 @@ type Phase =
   | { kind: "extract" }
   | { kind: "transcribe"; note?: string }
   | { kind: "done"; transcript: WhisperResult; title: string; duration: number | null; channel: string | null }
-  | { kind: "error"; message: string; stderrTail?: string };
+  | { kind: "error"; message: string; stderrTail?: string; traceback?: string };
 
 type ServerEvent =
   | { phase: "start"; url: string }
@@ -27,7 +27,7 @@ type ServerEvent =
       videoPath: string;
       audioPath: string;
     }
-  | { phase: "error"; message: string; stderrTail?: string };
+  | { phase: "error"; message: string; stderrTail?: string; traceback?: string };
 
 export function TranscribeWorkflow() {
   const [url, setUrl] = useState("");
@@ -174,7 +174,12 @@ function applyEvent(ev: ServerEvent, set: (p: Phase) => void) {
       });
       break;
     case "error":
-      set({ kind: "error", message: ev.message, stderrTail: ev.stderrTail });
+      set({
+        kind: "error",
+        message: ev.message,
+        stderrTail: ev.stderrTail,
+        traceback: ev.traceback,
+      });
       break;
   }
 }
@@ -289,27 +294,73 @@ function ErrorPanel({
 }: {
   phase: Extract<Phase, { kind: "error" }>;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [showStderr, setShowStderr] = useState(false);
+  const [showTraceback, setShowTraceback] = useState(true);
+
+  const copyAll = async () => {
+    const parts = [phase.message];
+    if (phase.traceback) parts.push("\n--- Python traceback ---\n" + phase.traceback);
+    if (phase.stderrTail) parts.push("\n--- stderr (last 20 lines) ---\n" + phase.stderrTail);
+    await navigator.clipboard.writeText(parts.join("\n"));
+  };
+
   return (
     <div className="rounded-lg bg-danger/[0.08] border border-danger/40 p-4">
-      <div className="text-[13px] text-white/90 font-medium mb-1">
-        Transcription failed
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div>
+          <div className="text-[13px] text-white/90 font-medium mb-1">
+            Transcription failed
+          </div>
+          <div className="text-[12px] text-white/70 font-mono whitespace-pre-wrap">
+            {phase.message}
+          </div>
+        </div>
+        <button
+          onClick={copyAll}
+          className="shrink-0 px-2 py-1 rounded text-[11px] border border-white/[0.08] text-white/60 hover:text-white hover:bg-white/[0.04]"
+        >
+          Copy all
+        </button>
       </div>
-      <div className="text-[12px] text-white/70 mb-2">{phase.message}</div>
-      {phase.stderrTail ? (
-        <>
+
+      {phase.traceback ? (
+        <div className="mt-3">
           <button
-            onClick={() => setExpanded((e) => !e)}
+            onClick={() => setShowTraceback((e) => !e)}
+            className="text-[11px] text-white/60 hover:text-white/90 underline underline-offset-2"
+          >
+            {showTraceback ? "Hide" : "Show"} Python traceback
+          </button>
+          {showTraceback ? (
+            <pre className="mt-2 p-3 rounded bg-black/40 text-[11px] text-white/75 font-mono whitespace-pre-wrap overflow-x-auto max-h-80">
+              {phase.traceback}
+            </pre>
+          ) : null}
+        </div>
+      ) : null}
+
+      {phase.stderrTail ? (
+        <div className="mt-3">
+          <button
+            onClick={() => setShowStderr((e) => !e)}
             className="text-[11px] text-white/50 hover:text-white/80 underline underline-offset-2"
           >
-            {expanded ? "Hide" : "Show"} last 20 stderr lines
+            {showStderr ? "Hide" : "Show"} last 20 stderr lines
           </button>
-          {expanded ? (
+          {showStderr ? (
             <pre className="mt-2 p-3 rounded bg-black/40 text-[11px] text-white/70 font-mono whitespace-pre-wrap overflow-x-auto max-h-64">
               {phase.stderrTail}
             </pre>
           ) : null}
-        </>
+        </div>
+      ) : null}
+
+      {!phase.traceback && !phase.stderrTail ? (
+        <div className="mt-2 text-[11px] text-white/40">
+          No extra diagnostics captured. Check the terminal running{" "}
+          <code className="font-mono text-white/60">npm run dev</code> for
+          Python output.
+        </div>
       ) : null}
     </div>
   );
