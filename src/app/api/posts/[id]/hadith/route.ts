@@ -1,0 +1,61 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getSupabaseServer } from "@/lib/supabase";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+type Params = { params: { id: string } };
+
+/**
+ * POST /api/posts/[id]/hadith — attach a hadith_verifications row to
+ * this post. Body: { hadith_id }. Idempotent.
+ */
+export async function POST(req: NextRequest, { params }: Params) {
+  let body: { hadith_id?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  if (!body.hadith_id) {
+    return NextResponse.json({ error: "Missing 'hadith_id'" }, { status: 400 });
+  }
+
+  const db = getSupabaseServer();
+
+  const { count } = await db
+    .from("post_hadith_refs")
+    .select("*", { count: "exact", head: true })
+    .eq("post_id", params.id);
+
+  const { error } = await db
+    .from("post_hadith_refs")
+    .upsert({
+      post_id: params.id,
+      hadith_id: body.hadith_id,
+      position: count || 0,
+    });
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
+
+/**
+ * DELETE /api/posts/[id]/hadith?hadith_id=... — detach a hadith ref.
+ */
+export async function DELETE(req: NextRequest, { params }: Params) {
+  const hadithId = req.nextUrl.searchParams.get("hadith_id");
+  if (!hadithId) {
+    return NextResponse.json({ error: "Missing 'hadith_id'" }, { status: 400 });
+  }
+
+  const db = getSupabaseServer();
+  const { error } = await db
+    .from("post_hadith_refs")
+    .delete()
+    .eq("post_id", params.id)
+    .eq("hadith_id", hadithId);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
