@@ -188,14 +188,36 @@ export async function transcribe(opts: TranscribeOptions): Promise<WhisperResult
     });
 
     if (code !== 0) {
-      let traceback: string | undefined;
+      let parsed: unknown = null;
       try {
         const raw = await readFile(outputPath, "utf-8");
-        const parsed = JSON.parse(raw);
-        if (parsed?.traceback) traceback = parsed.traceback;
+        parsed = JSON.parse(raw);
       } catch {
-        // Ignore — fall back to stderr.
+        // output missing or unreadable
       }
+
+      // If Python wrote a valid transcript before the non-zero exit, treat
+      // it as success. This covers Windows STATUS_STACK_BUFFER_OVERRUN
+      // (0xC0000409 / 3221226505) where CUDA crashes during interpreter
+      // shutdown AFTER the segments have been decoded and the JSON written.
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        Array.isArray((parsed as WhisperResult).segments) &&
+        (parsed as WhisperResult).segments.length > 0
+      ) {
+        onStderrLine?.(
+          `Note: WhisperX exited ${code} during shutdown, but transcript was ` +
+            `written successfully before the crash. Treating as success.`
+        );
+        return parsed as WhisperResult;
+      }
+
+      let traceback: string | undefined;
+      if (parsed && typeof parsed === "object" && "traceback" in parsed) {
+        traceback = (parsed as { traceback?: string }).traceback;
+      }
+
       const err: Error & { details?: WhisperError } = new Error(
         `WhisperX exited ${code}`
       );
