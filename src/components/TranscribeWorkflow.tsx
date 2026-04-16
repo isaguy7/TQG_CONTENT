@@ -196,7 +196,14 @@ export function TranscribeWorkflow() {
     setPhase({ kind: "idle" });
   }, []);
 
-  const busy = phase.kind !== "idle" && phase.kind !== "done" && phase.kind !== "error" && phase.kind !== "captions-not-found";
+  // Note: captions-not-found is treated as busy so the main button stays
+  // 'Cancel'. Only the amber panel's Yes/No buttons can advance or abort
+  // from that state — otherwise clicking the main button (thinking it's
+  // Cancel) would fire a fresh Transcribe.
+  const busy =
+    phase.kind !== "idle" &&
+    phase.kind !== "done" &&
+    phase.kind !== "error";
 
   return (
     <div className="space-y-4">
@@ -239,6 +246,7 @@ export function TranscribeWorkflow() {
               }
             }}
             disabled={!busy && !url.trim()}
+            aria-label={busy ? "Cancel transcription" : "Start transcription"}
             className={cn(
               "px-4 py-2 rounded-md text-[13px] transition-colors",
               busy
@@ -412,9 +420,15 @@ function CaptionsNotFoundPanel({
 }
 
 function PhaseStatus({ phase }: { phase: Phase }) {
-  const activeForTimer = phase.kind !== "idle" && phase.kind !== "done" && phase.kind !== "error";
+  const activeForTimer =
+    phase.kind !== "idle" &&
+    phase.kind !== "done" &&
+    phase.kind !== "error" &&
+    phase.kind !== "captions-not-found";
   const elapsed = useElapsed(activeForTimer);
 
+  // captions-not-found has its own panel (the amber prompt); don't render
+  // a stale progress row on top of it.
   if (!activeForTimer) return null;
 
   let label = "Starting…";
