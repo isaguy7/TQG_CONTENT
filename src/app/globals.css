@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 228 36% 14%;
+    --foreground: 0 0% 95%;
+    --surface: 240 4% 16%;
+    --sidebar: 235 38% 13%;
+    --muted: 240 4% 20%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 240 4% 22%;
+    --accent-foreground: 0 0% 95%;
+    --primary: 123 57% 24%;
+    --primary-foreground: 0 0% 98%;
+    --primary-hover: 123 45% 34%;
+    --border: 240 4% 24%;
+    --input: 240 4% 20%;
+    --ring: 123 57% 34%;
+    --warning: 38 92% 50%;
+    --success: 142 71% 45%;
+    --danger: 0 72% 51%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
