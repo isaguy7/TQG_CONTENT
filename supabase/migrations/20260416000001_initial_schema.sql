@@ -195,5 +195,5 @@ create table if not exists api_usage (
   post_id uuid references posts(id) on delete set null,
   created_at timestamptz not null default now()
 );
-create index if not exists api_usage_month_idx
-  on api_usage (date_trunc('month', created_at));
+create index if not exists api_usage_created_at_idx
+  on api_usage (created_at);
