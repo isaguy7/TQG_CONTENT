@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
 import { stat, mkdir } from "node:fs/promises";
-import { renderClip } from "@/lib/clip-renderer";
 import { getSupabaseServer } from "@/lib/supabase";
 import { getClipPlatform, type ClipPlatformId } from "@/lib/clip-platforms";
+import { ffmpegAvailable } from "@/lib/environment";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,6 +48,18 @@ async function exists(p: string): Promise<boolean> {
 }
 
 export async function POST(req: NextRequest) {
+  if (!ffmpegAvailable()) {
+    return NextResponse.json(
+      {
+        error:
+          "Clip rendering requires the local desktop app with GPU access.",
+      },
+      { status: 501 }
+    );
+  }
+  // Dynamic import keeps ffmpeg/spawn out of the Edge bundle on Vercel.
+  const { renderClip } = await import("@/lib/clip-renderer");
+
   let body: RenderRequest;
   try {
     body = (await req.json()) as RenderRequest;

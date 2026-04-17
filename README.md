@@ -37,6 +37,28 @@ npm run dev
 
 Opens at [http://localhost:3000](http://localhost:3000).
 
+## Deploy to Vercel
+
+1. Push to GitHub.
+2. Import the project in the Vercel dashboard.
+3. Set the environment variables from `.env.local.example` (Supabase URL + keys,
+   Anthropic key, Typefully, Unsplash). Secrets are referenced in
+   `vercel.json` as `@supabase-url`, `@anthropic-api-key`, etc.
+4. Deploy.
+5. GPU features (video transcription, clip rendering) only work on a local run.
+   On Vercel, `/api/transcribe` and `/api/clips/render` return 501 with a
+   clear message. Everything else (dashboard, content, figures, references,
+   calendar, settings) works identically on Vercel and local.
+
+## Auth
+
+Login is enforced by a Next.js middleware using Supabase Auth. To create the
+user:
+
+1. Supabase dashboard → Authentication → Settings → disable sign-up.
+2. Authentication → Users → Add user (email + password).
+3. Visit `/login`; the rest of the app stays blocked until you sign in.
+
 ## Architecture
 
 - **Next.js 14** (app router, TypeScript, Tailwind, dark mode default)
