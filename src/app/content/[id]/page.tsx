@@ -6,6 +6,7 @@ import Link from "next/link";
 import { PageShell } from "@/components/PageShell";
 import { cn } from "@/lib/utils";
 import type { HadithRecord } from "@/components/HadithPanel";
+import { buildSystemPrompt } from "@/lib/system-prompt";
 
 type PostStatus =
   | "idea"
@@ -26,17 +27,29 @@ type Post = {
   updated_at: string;
 };
 
+type Figure = {
+  id: string;
+  name_en: string;
+  name_ar: string | null;
+  title: string | null;
+  bio_short: string;
+  themes: string[];
+  notable_events: unknown;
+};
+
 export default function PostEditorPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const postId = params.id;
 
   const [post, setPost] = useState<Post | null>(null);
+  const [figure, setFigure] = useState<Figure | null>(null);
   const [attached, setAttached] = useState<HadithRecord[]>([]);
   const [allHadith, setAllHadith] = useState<HadithRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [copyMsg, setCopyMsg] = useState<string | null>(null);
   const [publishMsg, setPublishMsg] = useState<
     | { ok: true }
     | { ok: false; message: string; unverified?: Array<{ id: string; reference_text: string }> }
@@ -59,6 +72,15 @@ export default function PostEditorPage() {
       if (hadithRes.ok) {
         const { hadith } = (await hadithRes.json()) as { hadith: HadithRecord[] };
         setAllHadith(hadith);
+      }
+      if (post.figure_id) {
+        const figRes = await fetch(`/api/figures/${post.figure_id}`);
+        if (figRes.ok) {
+          const { figure } = (await figRes.json()) as { figure: Figure };
+          setFigure(figure);
+        }
+      } else {
+        setFigure(null);
       }
       setError(null);
     } catch (err) {
@@ -149,6 +171,30 @@ export default function PostEditorPage() {
     router.push("/content");
   };
 
+  const copyForClaude = async () => {
+    if (!post) return;
+    const payload = buildSystemPrompt({
+      figure: figure
+        ? {
+            nameEn: figure.name_en,
+            nameAr: figure.name_ar,
+            title: figure.title,
+            bioShort: figure.bio_short,
+            themes: figure.themes,
+            notableEvents: figure.notable_events,
+          }
+        : null,
+      topic: post.title,
+    });
+    try {
+      await navigator.clipboard.writeText(payload);
+      setCopyMsg("Copied");
+    } catch {
+      setCopyMsg("Copy failed");
+    }
+    setTimeout(() => setCopyMsg(null), 1500);
+  };
+
   const attachedIds = useMemo(() => new Set(attached.map((h) => h.id)), [attached]);
   const availableHadith = useMemo(
     () => allHadith.filter((h) => !attachedIds.has(h.id)),
@@ -193,6 +239,12 @@ export default function PostEditorPage() {
             </span>
           ) : null}
           <button
+            onClick={copyForClaude}
+            className="px-3 py-1.5 rounded text-[12px] font-medium bg-primary text-primary-foreground hover:bg-primary-hover"
+          >
+            {copyMsg || "Copy to Claude"}
+          </button>
+          <button
             onClick={deletePost}
             className="px-3 py-1.5 rounded text-[12px] border border-white/[0.08] text-white/50 hover:text-danger hover:border-danger/40"
           >
@@ -202,6 +254,17 @@ export default function PostEditorPage() {
       }
     >
       <div className="max-w-3xl space-y-6">
+        {figure ? (
+          <div className="flex items-center gap-2 text-[11px]">
+            <span className="text-white/40">About:</span>
+            <Link
+              href={`/figures/${figure.id}`}
+              className="inline-flex items-center rounded bg-white/[0.04] border border-white/[0.08] px-2 py-0.5 text-white/80 hover:bg-white/[0.08]"
+            >
+              {figure.name_en}
+            </Link>
+          </div>
+        ) : null}
         <section className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
           <label className="section-label block mb-2">Title</label>
           <input

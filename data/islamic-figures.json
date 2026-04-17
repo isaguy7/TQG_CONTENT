@@ -1,0 +1,291 @@
+[
+  {
+    "name_en": "Abu Bakr as-Siddiq",
+    "name_ar": "أبو بكر الصديق رضي الله عنه",
+    "type": "sahabi",
+    "era": "Early Islam",
+    "bio_short": "The first man to accept Islam and the closest companion of the Prophet ﷺ. He gave everything he owned for the sake of Allah and led the ummah through its most fragile moment after the Prophet's ﷺ death.",
+    "themes": ["faith", "sacrifice", "leadership", "loyalty", "steadfastness"],
+    "hook_angles": [
+      { "category": "scene", "text": "The Prophet ﷺ died. The strongest men in Madinah collapsed. One man stood up and held the entire ummah together." },
+      { "category": "contrast", "text": "He was a wealthy merchant. He gave away every single coin he owned. When asked what he left for his family, he said: Allah and His Messenger." },
+      { "category": "provocative", "text": "What does your faith look like when everything falls apart?" }
+    ],
+    "notable_events": [
+      { "event": "First man to accept Islam publicly", "description": "Believed immediately without hesitation when the Prophet ﷺ told him about the revelation." },
+      { "event": "Gave all his wealth", "description": "Donated his entire fortune for the expedition to Tabuk. When asked what he left for his family, he said 'Allah and His Messenger.' Verify the full narration on sunnah.com." },
+      { "event": "The cave during Hijra", "description": "Hid with the Prophet ﷺ in the Cave of Thawr during the migration to Madinah. Referenced in Quran 9:40." },
+      { "event": "Held the ummah after the Prophet's death", "description": "Delivered the speech 'Whoever worshipped Muhammad, Muhammad has died. Whoever worships Allah, Allah is alive and does not die.' Stabilised the community during the riddah wars." }
+    ],
+    "quran_refs": ["9:40"]
+  },
+  {
+    "name_en": "Umar ibn al-Khattab",
+    "name_ar": "عمر بن الخطاب رضي الله عنه",
+    "type": "sahabi",
+    "era": "Early Islam",
+    "bio_short": "Once one of Islam's fiercest opponents, he became its strongest enforcer. His conversion strengthened the Muslims so much they prayed openly at the Ka'bah for the first time. As caliph, he built the largest empire in the world while living in poverty.",
+    "themes": ["justice", "transformation", "strength", "humility", "governance"],
+    "hook_angles": [
+      { "category": "contrast", "text": "He set out to kill the Prophet ﷺ. He came back a Muslim." },
+      { "category": "scale", "text": "He ruled the largest empire on earth. He owned one shirt." },
+      { "category": "scene", "text": "A man walked into a room where the Roman and Persian ambassadors waited. They found the ruler of the Muslim world sleeping under a tree with no guards." }
+    ],
+    "notable_events": [
+      { "event": "Conversion to Islam", "description": "Left his house to kill the Prophet ﷺ but was redirected to his sister's home where he heard Quran recitation. Went to the Prophet ﷺ and accepted Islam. The Muslims prayed openly for the first time." },
+      { "event": "Expansion of the caliphate", "description": "Conquered Jerusalem, Persia, Egypt, and Syria while maintaining strict justice and personal poverty." },
+      { "event": "Walking with a sack of flour", "description": "Carried flour on his back to a starving family at night. When asked why, he said he would be asked about them on the Day of Judgement. Verify on sunnah.com." }
+    ],
+    "quran_refs": []
+  },
+  {
+    "name_en": "Uthman ibn Affan",
+    "name_ar": "عثمان بن عفان رضي الله عنه",
+    "type": "sahabi",
+    "era": "Early Islam",
+    "bio_short": "Known as Dhun-Nurayn for marrying two of the Prophet's ﷺ daughters. His most lasting legacy is the standardisation of the Quran into a single text, the mushaf used by every Muslim on earth today.",
+    "themes": ["generosity", "preservation", "modesty", "legacy", "sacrifice"],
+    "hook_angles": [
+      { "category": "scale", "text": "Every Quran on earth goes back to one man's decision." },
+      { "category": "provocative", "text": "The Quran you hold in your hands exists in that form because of one man's decision 1,400 years ago." },
+      { "category": "character", "text": "The Prophet ﷺ said the angels were shy of him. Think about what kind of character makes angels feel shy." }
+    ],
+    "notable_events": [
+      { "event": "Standardisation of the Quran", "description": "Commissioned a single standardised written text of the Quran and distributed copies across the Muslim world. Every mushaf today traces back to this." },
+      { "event": "Bought the well of Rumah", "description": "Purchased a well in Madinah and made it free for all Muslims when water was scarce." },
+      { "event": "Married two daughters of the Prophet ﷺ", "description": "First married Ruqayya, and after her death, married Umm Kulthum. Called Dhun-Nurayn for this honour." }
+    ],
+    "quran_refs": []
+  },
+  {
+    "name_en": "Ali ibn Abi Talib",
+    "name_ar": "علي بن أبي طالب رضي الله عنه",
+    "type": "sahabi",
+    "era": "Early Islam",
+    "bio_short": "The first child to accept Islam, raised in the household of the Prophet ﷺ. Known as the 'Gate to the City of Knowledge' and one of the bravest warriors in Islamic history. Married Fatimah, the Prophet's ﷺ daughter.",
+    "themes": ["knowledge", "courage", "wisdom", "youth", "devotion"],
+    "hook_angles": [
+      { "category": "scene", "text": "The night the Quraysh planned to kill the Prophet ﷺ, a teenager slept in his bed so he could escape." },
+      { "category": "provocative", "text": "He was 10 years old when he chose Islam. Most adults hadn't figured it out yet." },
+      { "category": "contrast", "text": "He could split an army in half on the battlefield. At home, he ground flour and mended shoes." }
+    ],
+    "notable_events": [
+      { "event": "Slept in the Prophet's bed during Hijra", "description": "Risked his life by sleeping in the Prophet's ﷺ bed the night of the migration so the assassins would think the Prophet ﷺ was still there." },
+      { "event": "Champion at Khaybar", "description": "The Prophet ﷺ said he would give the flag to someone who loves Allah and His Messenger. He gave it to Ali who conquered the fortress." },
+      { "event": "Gate of Knowledge", "description": "The Prophet ﷺ said 'I am the city of knowledge and Ali is its gate.' Verify on sunnah.com." }
+    ],
+    "quran_refs": []
+  },
+  {
+    "name_en": "Bilal ibn Rabah",
+    "name_ar": "بلال بن رباح رضي الله عنه",
+    "type": "sahabi",
+    "era": "Early Islam",
+    "bio_short": "A formerly enslaved Abyssinian who became the first muezzin of Islam. Tortured for his faith by being dragged across burning sand with a boulder on his chest, he repeated one word: Ahad. Abu Bakr purchased his freedom.",
+    "themes": ["perseverance", "faith", "equality", "calling", "steadfastness", "racism"],
+    "hook_angles": [
+      { "category": "scene", "text": "They dragged him across the burning sand. Placed a boulder on his chest. He said one word. Ahad." },
+      { "category": "contrast", "text": "He was enslaved. He became the voice that called an entire civilisation to prayer." },
+      { "category": "provocative", "text": "The first man chosen to call the adhan wasn't Arab, wasn't wealthy, wasn't free. He was a Black slave from Abyssinia." }
+    ],
+    "notable_events": [
+      { "event": "Tortured for his faith", "description": "Umayyah ibn Khalaf placed a heavy rock on his chest in the scorching heat of Makkah. Bilal repeated 'Ahad, Ahad' (One, One)." },
+      { "event": "First muezzin", "description": "The Prophet ﷺ chose him as the first person to call the adhan, despite others having 'better' voices by Arab standards." },
+      { "event": "Could not call adhan after the Prophet's death", "description": "After the Prophet ﷺ died, Bilal could not bring himself to call the adhan. When he finally did in Jerusalem years later, the companions wept. Verify on sunnah.com." }
+    ],
+    "quran_refs": []
+  },
+  {
+    "name_en": "Khadijah bint Khuwaylid",
+    "name_ar": "خديجة بنت خويلد رضي الله عنها",
+    "type": "sahabi",
+    "era": "Early Islam",
+    "bio_short": "The first person to accept Islam and the Prophet's ﷺ first wife. A successful businesswoman who employed the Prophet ﷺ before proposing marriage to him. She spent her entire fortune supporting the early Muslim community.",
+    "themes": ["support", "business", "sacrifice", "love", "strength", "pioneering"],
+    "hook_angles": [
+      { "category": "contrast", "text": "She was the wealthiest woman in Makkah. She proposed to a man who worked for her. Then she gave up everything for what he believed." },
+      { "category": "scene", "text": "He came down from the mountain trembling. She didn't question him. She didn't doubt. She wrapped him in a blanket and said: Allah will never disgrace you." },
+      { "category": "provocative", "text": "The first Muslim wasn't a warrior or a scholar. She was a businesswoman." }
+    ],
+    "notable_events": [
+      { "event": "First to accept Islam", "description": "When the Prophet ﷺ received the first revelation and came home shaking, Khadijah believed him without hesitation." },
+      { "event": "Proposed marriage to the Prophet ﷺ", "description": "A wealthy businesswoman who employed Muhammad ﷺ as a trade manager. Impressed by his character, she proposed to him." },
+      { "event": "The boycott years", "description": "Spent her entire fortune feeding and supporting the Muslim community during the three-year boycott by Quraysh. Died shortly after." }
+    ],
+    "quran_refs": []
+  },
+  {
+    "name_en": "Aisha bint Abi Bakr",
+    "name_ar": "عائشة بنت أبي بكر رضي الله عنها",
+    "type": "sahabi",
+    "era": "Early Islam",
+    "bio_short": "One of the greatest scholars in Islamic history. After the Prophet's ﷺ death, she became one of the primary sources of hadith and Islamic jurisprudence. Senior companions came to her to resolve their disagreements on fiqh.",
+    "themes": ["scholarship", "teaching", "intelligence", "authority", "legacy"],
+    "hook_angles": [
+      { "category": "scale", "text": "Over 2,200 hadith were narrated through her. Senior scholars twice her age came to her when they disagreed." },
+      { "category": "provocative", "text": "The greatest Islamic scholars of the first generation went to a young woman when they couldn't resolve a legal question." },
+      { "category": "character", "text": "She corrected other companions when they narrated hadith incorrectly. She didn't care about seniority. She cared about accuracy." }
+    ],
+    "notable_events": [
+      { "event": "Major hadith narrator", "description": "Narrated over 2,200 hadith. One of the top seven narrators in Islamic history." },
+      { "event": "Corrected senior companions", "description": "Known for correcting Abu Hurayra, Ibn Umar, and other senior companions on points of fiqh and hadith accuracy." },
+      { "event": "Taught from behind a curtain", "description": "Established a teaching circle that trained the next generation of scholars. Students came from across the Muslim world." }
+    ],
+    "quran_refs": ["24:11"]
+  },
+  {
+    "name_en": "Mus'ab ibn Umayr",
+    "name_ar": "مصعب بن عمير رضي الله عنه",
+    "type": "sahabi",
+    "era": "Early Islam",
+    "bio_short": "The most handsome and wealthy young man in Makkah who gave up everything for Islam. Sent to Madinah as its first ambassador, he converted most of the city before the Prophet ﷺ even arrived. Died at Uhud holding the banner.",
+    "themes": ["sacrifice", "youth", "dawah", "transformation", "beauty"],
+    "hook_angles": [
+      { "category": "contrast", "text": "He was the best-dressed man in Makkah. He died at Uhud in a shroud so short they had to cover his feet with grass." },
+      { "category": "scene", "text": "The Prophet ﷺ sent one man to Madinah. By the time he arrived a year later, most of the city was already Muslim." },
+      { "category": "loss", "text": "His mother disowned him. His wealth was taken. His clothes turned to rags. He smiled and kept teaching." }
+    ],
+    "notable_events": [
+      { "event": "Ambassador to Madinah", "description": "Sent as the first teacher to Madinah after the first pledge of Aqabah. Converted the majority of its population through his character and teaching." },
+      { "event": "Martyrdom at Uhud", "description": "Held the Prophet's ﷺ banner at the Battle of Uhud. When his right hand was cut, he held it with his left. When that was cut, he held it with his arms. He fell still holding it." },
+      { "event": "From luxury to poverty", "description": "Was the wealthiest and most pampered young man in Makkah. After accepting Islam, his family stripped everything. When he died, there wasn't enough cloth to cover his full body." }
+    ],
+    "quran_refs": []
+  },
+  {
+    "name_en": "Abdur Rahman ibn Auf",
+    "name_ar": "عبد الرحمن بن عوف رضي الله عنه",
+    "type": "sahabi",
+    "era": "Early Islam",
+    "bio_short": "Arrived in Madinah with nothing after the Hijra. Refused charity, asked for the marketplace instead. Built one of the largest trading empires in history and gave most of it away. One of the ten promised Jannah.",
+    "themes": ["entrepreneurship", "generosity", "self-reliance", "wealth", "gratitude"],
+    "hook_angles": [
+      { "category": "scale", "text": "His caravans were so large that when Madinah saw dust on the horizon, they already knew it was him." },
+      { "category": "refusal", "text": "Sa'd offered him half his wealth and one of his wives. He said no to both. He said: show me where the marketplace is." },
+      { "category": "character", "text": "He didn't want charity. He wanted a market. That tells you everything about who he was." }
+    ],
+    "notable_events": [
+      { "event": "Refused Sa'd's offer", "description": "When paired with Sa'd ibn ar-Rabi in Madinah, Sa'd offered half his wealth and one of his wives. Abdur Rahman refused and asked to be shown the marketplace. Verify full narration on sunnah.com." },
+      { "event": "Built a trading empire from nothing", "description": "Started with wood and rope. Within a short time became one of the wealthiest traders in Madinah." },
+      { "event": "Massive charitable giving", "description": "Freed 30 slaves in a single day. Gave 400 gold coins to every surviving veteran of Badr. Donated 700 camels in one caravan." }
+    ],
+    "quran_refs": []
+  },
+  {
+    "name_en": "Abu Ubaidah ibn al-Jarrah",
+    "name_ar": "أبو عبيدة بن الجراح رضي الله عنه",
+    "type": "sahabi",
+    "era": "Early Islam",
+    "bio_short": "Called 'The Trustworthy of this Ummah' by the Prophet ﷺ. Led the Muslim armies in Syria and lived in absolute simplicity. When Umar visited him as caliph, he found nothing in his house except a sword, a shield, and a saddle.",
+    "themes": ["trust", "humility", "leadership", "simplicity", "duty"],
+    "hook_angles": [
+      { "category": "contrast", "text": "He commanded the largest Muslim army in history. His house had a sword, a shield, and nothing else." },
+      { "category": "scene", "text": "Umar walked into his general's home expecting luxury. He found an empty room. He started to cry." },
+      { "category": "character", "text": "The Prophet ﷺ said every nation has a trustworthy man. This ummah's is Abu Ubaidah. Verify on sunnah.com." }
+    ],
+    "notable_events": [
+      { "event": "Called the Trustworthy", "description": "The Prophet ﷺ said 'Every nation has a trustworthy man, and the trustworthy man of this nation is Abu Ubaidah.' Verify on sunnah.com — search Bukhari 3744." },
+      { "event": "Umar's visit", "description": "When Umar visited Abu Ubaidah in Syria, he found an empty house with only a sword and shield. Umar wept. The narration is in Shu'ab al-Iman by al-Bayhaqi — verify via askimam.org." },
+      { "event": "Commander of the armies in Syria", "description": "Led the conquest of Syria and Palestine. Maintained extreme personal simplicity despite commanding vast resources." }
+    ],
+    "quran_refs": []
+  },
+  {
+    "name_en": "Khalid ibn al-Walid",
+    "name_ar": "خالد بن الوليد رضي الله عنه",
+    "type": "sahabi",
+    "era": "Early Islam",
+    "bio_short": "Called 'The Sword of Allah' by the Prophet ﷺ. Before Islam, he was the military genius who defeated the Muslims at Uhud. After converting, he never lost a single battle. He died in his bed and wept because he couldn't die as a martyr.",
+    "themes": ["strategy", "transformation", "courage", "undefeated", "regret"],
+    "hook_angles": [
+      { "category": "contrast", "text": "The Prophet ﷺ called him the Sword of Allah. Before that, he was one of Islam's most dangerous enemies." },
+      { "category": "scene", "text": "He lay on his deathbed and wept. Not from pain. From regret that he was dying in bed and not on a battlefield." },
+      { "category": "scale", "text": "He fought in over 100 battles. He never lost a single one." }
+    ],
+    "notable_events": [
+      { "event": "Defeated Muslims at Uhud", "description": "Before his conversion, his cavalry charge turned the Battle of Uhud into a Muslim defeat." },
+      { "event": "Never lost a battle", "description": "After converting, he commanded Muslim forces in over 100 engagements and was never defeated." },
+      { "event": "Wept on his deathbed", "description": "Died of natural causes. Famously said there was not a spot on his body without a wound, yet he was dying in bed like a camel. He wept because he wanted martyrdom." }
+    ],
+    "quran_refs": []
+  },
+  {
+    "name_en": "Sa'd ibn Abi Waqqas",
+    "name_ar": "سعد بن أبي وقاص رضي الله عنه",
+    "type": "sahabi",
+    "era": "Early Islam",
+    "bio_short": "One of the earliest converts and the first person to shoot an arrow in the defence of Islam. Known for his powerful dua — the Prophet ﷺ said his supplications were always answered. Conquered the Persian Empire at the Battle of Qadisiyyah.",
+    "themes": ["perseverance", "dua", "warfare", "answered_prayers", "forgiveness"],
+    "hook_angles": [
+      { "category": "scene", "text": "They feared his hands when he raised them. Not because he held a sword. Because he held a dua." },
+      { "category": "provocative", "text": "The Prophet ﷺ said when this man raises his hands, Allah answers. What do you do that we don't?" },
+      { "category": "character", "text": "He refused to carry poison in his chest. People wronged him. He made dua for them instead of against them." }
+    ],
+    "notable_events": [
+      { "event": "First arrow in Islam", "description": "Shot the first arrow ever in defence of Islam. One of the earliest converts." },
+      { "event": "Answered dua", "description": "The Prophet ﷺ said 'O Allah, answer his supplication.' His dua became known as never being rejected. Verify on sunnah.com." },
+      { "event": "Conquered Persia", "description": "Led the Muslim forces at the Battle of Qadisiyyah which brought down the Persian Sassanid Empire." },
+      { "event": "Refused to curse Ali", "description": "When asked to curse Ali during political conflict, he refused and said he would not carry poison in his chest." }
+    ],
+    "quran_refs": []
+  },
+  {
+    "name_en": "Salahuddin al-Ayyubi",
+    "name_ar": "صلاح الدين الأيوبي رحمه الله",
+    "type": "scholar",
+    "era": "Crusader period (12th century)",
+    "bio_short": "Liberated Jerusalem from the Crusaders after 88 years of occupation. Known for his justice even to enemies. When Richard the Lionheart fell ill, Salahuddin sent his own physician and fresh fruit. Died with barely enough money for his burial.",
+    "themes": ["leadership", "justice", "mercy", "patience", "liberation"],
+    "hook_angles": [
+      { "category": "contrast", "text": "When the Crusaders took Jerusalem, they massacred everyone inside. When Salahuddin took it back, he let them leave safely." },
+      { "category": "scene", "text": "His enemy was dying. Instead of celebrating, he sent his own doctor across enemy lines." },
+      { "category": "provocative", "text": "He freed Jerusalem. When he died, they had to borrow money to bury him." }
+    ],
+    "notable_events": [
+      { "event": "Reconquest of Jerusalem (1187)", "description": "Defeated the Crusader forces at the Battle of Hattin and recaptured Jerusalem. Unlike the Crusader conquest, there was no massacre." },
+      { "event": "Mercy to Richard the Lionheart", "description": "When Richard fell ill during the Third Crusade, Salahuddin sent his personal physician and ice with fruit." },
+      { "event": "Died in poverty", "description": "Despite ruling a vast territory, he gave away nearly everything. When he died in 1193, there was not enough money in his treasury for his burial." }
+    ],
+    "quran_refs": []
+  },
+  {
+    "name_en": "Yusuf",
+    "name_ar": "يوسف عليه السلام",
+    "type": "prophet",
+    "era": "Ancient (pre-Mosaic)",
+    "bio_short": "Thrown into a well by his own brothers, sold into slavery, falsely accused, and imprisoned for years. Through all of it he never lost faith. Eventually rose to become the most powerful man in Egypt and forgave every person who wronged him.",
+    "themes": ["patience", "beauty", "forgiveness", "betrayal", "resilience", "dreams"],
+    "hook_angles": [
+      { "category": "scene", "text": "His brothers threw him into a well. Years later, he stood in front of them as the most powerful man in Egypt." },
+      { "category": "contrast", "text": "They sold him for a handful of coins. He forgave them for free." },
+      { "category": "provocative", "text": "Every single person in his life betrayed him. His brothers, his employer's wife, his cellmate. He forgave all of them." }
+    ],
+    "notable_events": [
+      { "event": "Thrown into the well", "description": "His brothers threw him into a well out of jealousy and told their father a wolf had eaten him." },
+      { "event": "Resisted temptation", "description": "The wife of the Aziz attempted to seduce him. He refused and was imprisoned for years as a result." },
+      { "event": "Rose to power in Egypt", "description": "Interpreted the king's dream about seven years of plenty and seven of famine. Was appointed to manage Egypt's resources." },
+      { "event": "Forgave his brothers", "description": "When his brothers came to Egypt during the famine, he revealed himself and forgave them. Said 'No blame upon you today.'" }
+    ],
+    "quran_refs": ["12:4", "12:23", "12:87", "12:90", "12:92"]
+  },
+  {
+    "name_en": "Musa",
+    "name_ar": "موسى عليه السلام",
+    "type": "prophet",
+    "era": "Ancient (Pharaonic Egypt)",
+    "bio_short": "The most mentioned prophet in the Quran. Raised in the palace of Fir'awn, the man who would become his greatest enemy. Led the Israelites out of slavery, spoke directly to Allah, and received the Torah on Mount Sinai.",
+    "themes": ["courage", "confrontation", "liberation", "speech", "trust_in_Allah"],
+    "hook_angles": [
+      { "category": "scene", "text": "He had a stutter. Allah told him to go speak to the most powerful man on earth." },
+      { "category": "contrast", "text": "The man who raised him became the man he had to destroy." },
+      { "category": "provocative", "text": "He killed a man by accident. Fled as a fugitive. Came back as a prophet." }
+    ],
+    "notable_events": [
+      { "event": "Raised in Fir'awn's palace", "description": "As a baby, placed in a basket on the Nile by his mother. Found and raised by the family of the very tyrant who was killing Israelite children." },
+      { "event": "The burning bush", "description": "While travelling, saw a fire on Mount Sinai. Allah spoke to him directly and gave him his mission." },
+      { "event": "Confrontation with Fir'awn", "description": "Returned to Egypt to demand the freedom of the Israelites. Performed miracles but Fir'awn refused until the plagues." },
+      { "event": "Parting of the sea", "description": "With Fir'awn's army behind them and the sea in front, Allah commanded Musa to strike the sea with his staff. It split open." }
+    ],
+    "quran_refs": ["20:25-28", "28:7", "26:63", "7:143"]
+  }
+]
