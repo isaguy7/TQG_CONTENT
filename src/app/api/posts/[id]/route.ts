@@ -70,6 +70,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     image_rationale?: string | null;
     scheduled_for?: string | null;
     topic_tags?: string[];
+    quran_refs?: unknown;
+    labels?: string[];
+    deleted_at?: string | null;
   };
   try {
     body = await req.json();
@@ -102,6 +105,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     "image_rationale",
     "scheduled_for",
     "topic_tags",
+    "quran_refs",
+    "labels",
+    "deleted_at",
   ];
   for (const k of writable) {
     if (body[k] !== undefined) update[k] = body[k];
@@ -145,12 +151,30 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   return NextResponse.json({ post: data });
 }
 
-export async function DELETE(_req: NextRequest, { params }: Params) {
+/**
+ * DELETE /api/posts/[id]
+ *   default → soft delete: sets deleted_at = now()
+ *   ?permanent=true → hard delete (only callable from the trash UI)
+ */
+export async function DELETE(req: NextRequest, { params }: Params) {
   if (!isUuid(params.id)) {
     return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
   }
   const db = getSupabaseServer();
-  const { error } = await db.from("posts").delete().eq("id", params.id);
+  const permanent = req.nextUrl.searchParams.get("permanent") === "true";
+  if (permanent) {
+    const { error } = await db.from("posts").delete().eq("id", params.id);
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, permanent: true });
+  }
+  const { data, error } = await db
+    .from("posts")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", params.id)
+    .select()
+    .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, post: data });
 }
