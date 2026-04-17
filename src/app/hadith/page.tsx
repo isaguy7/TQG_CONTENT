@@ -7,8 +7,11 @@ import {
   HadithList,
   type HadithRecord,
 } from "@/components/HadithPanel";
+import { QuranBrowser } from "@/components/QuranBrowser";
+import { cn } from "@/lib/utils";
 
 export default function HadithPage() {
+  const [tab, setTab] = useState<"hadith" | "quran">("hadith");
   const [hadith, setHadith] = useState<HadithRecord[]>([]);
   const [corpusCount, setCorpusCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,9 +97,41 @@ export default function HadithPage() {
 
   return (
     <PageShell
-      title="Hadith verification"
-      description="Every reference must link to sunnah.com and be manually verified"
+      title="References"
+      description="Hadith verification + Quran browsing"
     >
+      <div className="max-w-4xl">
+        <div className="flex items-center gap-1 border-b border-white/[0.06] mb-5">
+          <button
+            onClick={() => setTab("hadith")}
+            className={cn(
+              "px-4 py-2 text-[13px] border-b-2 -mb-px transition-colors",
+              tab === "hadith"
+                ? "border-primary-bright text-white/90"
+                : "border-transparent text-white/50 hover:text-white/80"
+            )}
+          >
+            Hadith
+          </button>
+          <button
+            onClick={() => setTab("quran")}
+            className={cn(
+              "px-4 py-2 text-[13px] border-b-2 -mb-px transition-colors",
+              tab === "quran"
+                ? "border-primary-bright text-white/90"
+                : "border-transparent text-white/50 hover:text-white/80"
+            )}
+          >
+            Quran
+          </button>
+        </div>
+      </div>
+
+      {tab === "quran" ? (
+        <div className="max-w-4xl">
+          <QuranBrowser />
+        </div>
+      ) : (
       <div className="max-w-4xl space-y-6">
         <div className="grid grid-cols-4 gap-3">
           <StatTile label="Total" value={String(hadith.length)} />
@@ -152,6 +187,7 @@ export default function HadithPage() {
           </p>
         </section>
       </div>
+      )}
     </PageShell>
   );
 }
