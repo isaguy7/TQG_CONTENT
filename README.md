@@ -3,8 +3,8 @@
 Local-first content creation, video editing, and Islamic knowledge toolkit
 for [The Quran Group](https://thequrangroup.com).
 
-Built to run on a single workstation (i9 + RTX 4090). Zero recurring cost
-beyond existing subscriptions.
+Built to run on a single workstation (i9 + RTX 4060 Ti 8GB). Zero recurring
+cost beyond existing subscriptions.
 
 ## Status
 
@@ -21,7 +21,7 @@ deferred to v2.
 | --------------- | -------------------------------------- |
 | Node.js 20+     | Next.js runtime                        |
 | Python 3.10+    | WhisperX (Phase 1)                     |
-| CUDA 12.x       | GPU acceleration on 4090               |
+| CUDA 12.x       | GPU acceleration on RTX 4060 Ti        |
 | ffmpeg + NVENC  | Audio/video processing                 |
 | yt-dlp          | Video downloads (pinned, upgradable)   |
 | Supabase project | Database (free tier is enough)        |

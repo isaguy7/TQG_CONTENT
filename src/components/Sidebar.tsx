@@ -29,12 +29,12 @@ const primaryNav: NavItem[] = [
   { href: "/figures", label: "Figures", icon: Users },
   { href: "/clips", label: "Clips", icon: Film },
   { href: "/calendar", label: "Calendar", icon: CalendarIcon },
+  { href: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
 const secondaryNav: NavItem[] = [
   { href: "/video", label: "Video", icon: Video },
-  { href: "/hadith", label: "Hadith", icon: BookOpen },
-  { href: "/settings", label: "Settings", icon: SettingsIcon },
+  { href: "/hadith", label: "Hadith corpus", icon: BookOpen },
 ];
 
 type Draft = {
@@ -92,6 +92,9 @@ export function Sidebar() {
       </nav>
 
       <div className="mt-1 border-t border-white/[0.04] pt-2 pb-3 px-2">
+        <div className="px-3 pb-1.5 text-[9px] uppercase tracking-[0.1em] text-white/30 font-semibold">
+          Tools
+        </div>
         {secondaryNav.map((item) => (
           <NavLink key={item.href} item={item} pathname={pathname || ""} />
         ))}

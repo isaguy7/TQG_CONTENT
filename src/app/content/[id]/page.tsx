@@ -25,6 +25,8 @@ import { HookGenerator } from "@/components/HookGenerator";
 import { SlopChecker } from "@/components/SlopChecker";
 import { TypefullyPush } from "@/components/TypefullyPush";
 import { ImagePicker } from "@/components/ImagePicker";
+import { SmartHadithSuggestions } from "@/components/SmartHadithSuggestions";
+import { QuranPanel, type QuranRef } from "@/components/QuranPanel";
 
 type PostStatus =
   | "idea"
@@ -66,6 +68,7 @@ export default function PostEditorPage() {
   const [figure, setFigure] = useState<Figure | null>(null);
   const [attached, setAttached] = useState<HadithRecord[]>([]);
   const [allHadith, setAllHadith] = useState<HadithRecord[]>([]);
+  const [quranRefs, setQuranRefs] = useState<QuranRef[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
@@ -94,6 +97,15 @@ export default function PostEditorPage() {
       if (hadithRes.ok) {
         const { hadith } = (await hadithRes.json()) as { hadith: HadithRecord[] };
         setAllHadith(hadith);
+      }
+      try {
+        const qRes = await fetch(`/api/posts/${postId}/quran`);
+        if (qRes.ok) {
+          const { refs } = (await qRes.json()) as { refs: QuranRef[] };
+          setQuranRefs(refs);
+        }
+      } catch {
+        // silent — quran refs are optional
       }
       if (post.figure_id) {
         const fRes = await fetch(`/api/figures/${post.figure_id}`).catch(
@@ -478,6 +490,19 @@ export default function PostEditorPage() {
           onScheduled={() => {
             save({ status: "scheduled" });
           }}
+        />
+
+        <SmartHadithSuggestions
+          content={draft}
+          postId={post.id}
+          attachedHadithIds={attachedIds}
+          onAttached={loadPost}
+        />
+
+        <QuranPanel
+          postId={post.id}
+          refs={quranRefs}
+          onRefsChange={setQuranRefs}
         />
 
         <section className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
