@@ -27,6 +27,7 @@ import { TypefullyPush } from "@/components/TypefullyPush";
 import { ImagePicker } from "@/components/ImagePicker";
 import { FigureAvailableRefs } from "@/components/FigureAvailableRefs";
 import { AmbientSuggestions } from "@/components/AmbientSuggestions";
+import { PostLabels } from "@/components/PostLabels";
 
 type PostStatus =
   | "idea"
@@ -46,6 +47,8 @@ type Post = {
   hook_selected: string | null;
   image_url: string | null;
   image_rationale: string | null;
+  labels: string[] | null;
+  quran_refs: unknown;
   updated_at: string;
 };
 
@@ -352,6 +355,15 @@ export default function PostEditorPage() {
             placeholder="Title"
             className="w-full bg-transparent border-0 text-center text-[18px] font-semibold text-white/90 placeholder-white/25 focus:outline-none"
           />
+          <div className="mt-2 flex justify-center">
+            <PostLabels
+              labels={post.labels || []}
+              onChange={(labels) => {
+                setPost({ ...post, labels });
+                save({ labels } as Partial<Post>);
+              }}
+            />
+          </div>
         </div>
 
         <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-5">
