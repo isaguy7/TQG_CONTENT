@@ -10,6 +10,7 @@ import {
 
 export default function HadithPage() {
   const [hadith, setHadith] = useState<HadithRecord[]>([]);
+  const [corpusCount, setCorpusCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,6 +30,16 @@ export default function HadithPage() {
 
   useEffect(() => {
     refresh();
+    (async () => {
+      try {
+        const res = await fetch("/api/hadith-corpus/search?limit=0");
+        if (!res.ok) return;
+        const json = (await res.json()) as { total: number };
+        setCorpusCount(json.total);
+      } catch {
+        // corpus count is informational — silent failure is fine
+      }
+    })();
   }, [refresh]);
 
   const handleToggleVerified = useCallback(
@@ -87,7 +98,7 @@ export default function HadithPage() {
       description="Every reference must link to sunnah.com and be manually verified"
     >
       <div className="max-w-4xl space-y-6">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-4 gap-3">
           <StatTile label="Total" value={String(hadith.length)} />
           <StatTile
             label="Verified"
@@ -98,6 +109,10 @@ export default function HadithPage() {
             label="Unverified"
             value={String(hadith.length - verifiedCount)}
             tone={hadith.length - verifiedCount > 0 ? "danger" : "muted"}
+          />
+          <StatTile
+            label="Corpus"
+            value={corpusCount === null ? "—" : corpusCount.toLocaleString()}
           />
         </div>
 
