@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { PageShell } from "@/components/PageShell";
@@ -78,6 +78,7 @@ export default function PostEditorPage() {
     | { ok: false; message: string; unverified?: Array<{ id: string; reference_text: string }> }
     | null
   >(null);
+  const initialLoadDone = useRef(false);
 
   const loadPost = useCallback(async () => {
     try {
@@ -91,7 +92,10 @@ export default function PostEditorPage() {
         hadith_refs: HadithRecord[];
       };
       setPost(post);
-      setDraft(post.final_content || "");
+      if (!initialLoadDone.current) {
+        setDraft(post.final_content || "");
+        initialLoadDone.current = true;
+      }
       setAttached(hadith_refs || []);
       if (hadithRes.ok) {
         const { hadith } = (await hadithRes.json()) as { hadith: HadithRecord[] };
@@ -457,8 +461,13 @@ export default function PostEditorPage() {
             </button>
           </div>
 
-          {convertOpen ? (
+          {convertOpen && post.platform === "linkedin" ? (
             <ConvertPreviews content={draft} />
+          ) : convertOpen ? (
+            <div className="mt-3 text-[11px] text-white/40">
+              Conversion previews are available when the source platform is
+              LinkedIn.
+            </div>
           ) : null}
         </div>
 

@@ -339,12 +339,17 @@ export function SearchCorpus({
       if (collection) params.set("collection", collection);
       const res = await fetch(`/api/hadith-corpus/search?${params.toString()}`);
       const json = (await res.json()) as {
-        results: CorpusRow[];
-        total: number;
+        results?: CorpusRow[];
+        total?: number;
+        error?: string;
       };
-      setResults(json.results);
-      setTotal(json.total);
-      if (json.results.length === 0) {
+      if (!res.ok) {
+        throw new Error(json.error || `HTTP ${res.status}`);
+      }
+      const rows = json.results || [];
+      setResults(rows);
+      setTotal(json.total ?? 0);
+      if (rows.length === 0) {
         setMessage("No hadith matched. Try different keywords.");
       }
     } catch (err) {
@@ -452,9 +457,18 @@ export function SearchCorpus({
                     <button
                       onClick={() => addResult(r)}
                       disabled={adding === r.id}
+                      title={
+                        r.sunnah_com_url
+                          ? undefined
+                          : "No sunnah.com URL available — will be added as reference-only"
+                      }
                       className="px-2 py-1 rounded text-[11px] border border-white/[0.08] text-white/70 hover:text-white hover:bg-white/[0.04] disabled:opacity-40"
                     >
-                      {adding === r.id ? "Adding…" : "Add"}
+                      {adding === r.id
+                        ? "Adding…"
+                        : r.sunnah_com_url
+                        ? "Add"
+                        : "Add (no URL)"}
                     </button>
                   </div>
                   {r.narrator ? (

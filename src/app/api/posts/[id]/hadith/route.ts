@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase";
+import { isUuid } from "@/lib/utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,14 +12,20 @@ type Params = { params: { id: string } };
  * this post. Body: { hadith_id }. Idempotent.
  */
 export async function POST(req: NextRequest, { params }: Params) {
+  if (!isUuid(params.id)) {
+    return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
+  }
   let body: { hadith_id?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  if (!body.hadith_id) {
-    return NextResponse.json({ error: "Missing 'hadith_id'" }, { status: 400 });
+  if (!body.hadith_id || !isUuid(body.hadith_id)) {
+    return NextResponse.json(
+      { error: "Missing or invalid 'hadith_id'" },
+      { status: 400 }
+    );
   }
 
   const db = getSupabaseServer();
@@ -44,9 +51,15 @@ export async function POST(req: NextRequest, { params }: Params) {
  * DELETE /api/posts/[id]/hadith?hadith_id=... — detach a hadith ref.
  */
 export async function DELETE(req: NextRequest, { params }: Params) {
+  if (!isUuid(params.id)) {
+    return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
+  }
   const hadithId = req.nextUrl.searchParams.get("hadith_id");
-  if (!hadithId) {
-    return NextResponse.json({ error: "Missing 'hadith_id'" }, { status: 400 });
+  if (!hadithId || !isUuid(hadithId)) {
+    return NextResponse.json(
+      { error: "Missing or invalid 'hadith_id'" },
+      { status: 400 }
+    );
   }
 
   const db = getSupabaseServer();

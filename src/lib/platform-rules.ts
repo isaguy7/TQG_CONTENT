@@ -87,7 +87,7 @@ export const PLATFORMS: Record<PlatformId, PlatformConfig> = {
 };
 
 export function getPlatform(id: string | null | undefined): PlatformConfig {
-  if (id && (id as PlatformId) in PLATFORMS) {
+  if (id && Object.hasOwn(PLATFORMS, id)) {
     return PLATFORMS[id as PlatformId];
   }
   return PLATFORMS.linkedin;
