@@ -403,7 +403,7 @@ export function SearchCorpus({
         <select
           value={collection}
           onChange={(e) => setCollection(e.target.value)}
-          className="bg-white/[0.03] border border-white/[0.08] rounded-md px-2 py-2 text-[12px] text-white/85"
+          className="bg-zinc-900 border border-white/[0.08] rounded-md px-2 py-2 text-[12px] text-white/85 [&>option]:bg-zinc-900 [&>option]:text-white/85"
         >
           {CORPUS_COLLECTIONS.map((c) => (
             <option key={c.slug || "all"} value={c.slug}>
