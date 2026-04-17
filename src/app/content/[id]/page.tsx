@@ -72,7 +72,7 @@ export default function PostEditorPage() {
   const [copyMsg, setCopyMsg] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [corpusOpen, setCorpusOpen] = useState(false);
-  const [convertOpen, setConvertOpen] = useState(false);
+  const [convertOpen, setConvertOpen] = useState(true);
   const [publishMsg, setPublishMsg] = useState<
     { ok: true } | { ok: false; message: string } | null
   >(null);
@@ -286,7 +286,7 @@ export default function PostEditorPage() {
           ) : null}
           <button
             onClick={copyForClaude}
-            className="px-3 py-1.5 rounded text-[12px] border border-white/[0.08] text-white/85 hover:text-white hover:bg-white/[0.04]"
+            className="px-3 py-1.5 rounded text-[12px] font-medium bg-primary text-primary-foreground hover:bg-primary-hover"
           >
             Copy to Claude
           </button>
