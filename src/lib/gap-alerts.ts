@@ -41,32 +41,30 @@ export function currentWeekStart(d: Date = new Date()): string {
 export async function ensureCurrentWeek(): Promise<WeeklyCalendar> {
   const db = getSupabaseServer();
   const week = currentWeekStart();
-  const { data: existing } = await db
+  // Upsert with ignoreDuplicates eliminates the check-then-insert race.
+  await db
+    .from("content_calendar")
+    .upsert({ week_start: week }, {
+      onConflict: "week_start",
+      ignoreDuplicates: true,
+    });
+  const { data, error } = await db
     .from("content_calendar")
     .select("*")
     .eq("week_start", week)
-    .maybeSingle();
-  if (existing) return existing as WeeklyCalendar;
-  const { data: inserted, error } = await db
-    .from("content_calendar")
-    .insert({ week_start: week })
-    .select()
     .single();
-  if (error) {
-    // Another request inserted concurrently; refetch.
-    const { data: row } = await db
-      .from("content_calendar")
-      .select("*")
-      .eq("week_start", week)
-      .maybeSingle();
-    return row as WeeklyCalendar;
+  if (error || !data) {
+    throw new Error(
+      `Calendar week fetch failed after upsert: ${error?.message || "no row"}`
+    );
   }
-  return inserted as WeeklyCalendar;
+  return data as WeeklyCalendar;
 }
 
 export async function computeGapAlerts(): Promise<GapAlert[]> {
   const db = getSupabaseServer();
   const calendar = await ensureCurrentWeek();
+  if (!calendar) return [];
   const alerts: GapAlert[] = [];
 
   const since3d = new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString();

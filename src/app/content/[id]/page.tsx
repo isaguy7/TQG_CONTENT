@@ -25,6 +25,9 @@ import { HookGenerator } from "@/components/HookGenerator";
 import { SlopChecker } from "@/components/SlopChecker";
 import { TypefullyPush } from "@/components/TypefullyPush";
 import { ImagePicker } from "@/components/ImagePicker";
+import { FigureAvailableRefs } from "@/components/FigureAvailableRefs";
+import { AmbientSuggestions } from "@/components/AmbientSuggestions";
+import { PostLabels } from "@/components/PostLabels";
 
 type PostStatus =
   | "idea"
@@ -44,6 +47,8 @@ type Post = {
   hook_selected: string | null;
   image_url: string | null;
   image_rationale: string | null;
+  labels: string[] | null;
+  quran_refs: unknown;
   updated_at: string;
 };
 
@@ -196,7 +201,13 @@ export default function PostEditorPage() {
   };
 
   const deletePost = async () => {
-    if (!confirm("Delete this draft?")) return;
+    if (
+      !confirm(
+        "Move this draft to trash? You can restore it within 7 days."
+      )
+    ) {
+      return;
+    }
     await fetch(`/api/posts/${postId}`, { method: "DELETE" });
     router.push("/content");
   };
@@ -344,6 +355,15 @@ export default function PostEditorPage() {
             placeholder="Title"
             className="w-full bg-transparent border-0 text-center text-[18px] font-semibold text-white/90 placeholder-white/25 focus:outline-none"
           />
+          <div className="mt-2 flex justify-center">
+            <PostLabels
+              labels={post.labels || []}
+              onChange={(labels) => {
+                setPost({ ...post, labels });
+                save({ labels } as Partial<Post>);
+              }}
+            />
+          </div>
         </div>
 
         <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-5">
@@ -470,6 +490,66 @@ export default function PostEditorPage() {
             </div>
           ) : null}
         </div>
+
+        <AmbientSuggestions
+          draft={draft}
+          figureName={figure?.name_en || null}
+          onPickHadith={async (row) => {
+            try {
+              const res = await fetch("/api/hadith", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  url: row.sunnah_com_url,
+                  reference_text: `${row.collection_name} ${row.hadith_number}`,
+                  narrator: row.narrator,
+                  arabic_text: row.arabic_text,
+                  translation_en: row.english_text,
+                }),
+              });
+              if (!res.ok) return;
+              const { hadith } = await res.json();
+              await fetch(`/api/posts/${postId}/hadith`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ hadith_id: hadith.id }),
+              });
+              loadPost();
+            } catch {
+              /* noop */
+            }
+          }}
+          onPickAyah={async (ayah) => {
+            try {
+              const current =
+                ((post as unknown as { quran_refs?: unknown[] })
+                  .quran_refs as unknown[]) || [];
+              const next = [
+                ...current,
+                {
+                  verse_key: ayah.verse_key,
+                  text_uthmani: ayah.text_uthmani,
+                  translation_en: ayah.translation_en,
+                },
+              ];
+              await save({
+                quran_refs: next,
+              } as unknown as Partial<Post>);
+            } catch {
+              /* noop */
+            }
+          }}
+        />
+
+        {figure ? (
+          <FigureAvailableRefs
+            figureId={figure.id}
+            figureName={figure.name_en}
+            postId={post.id}
+            attachedHadithIds={attachedIds}
+            onAttachedHadith={loadPost}
+          />
+        ) : null}
 
         <HookGenerator
           postId={post.id}

@@ -7,13 +7,23 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const db = getSupabaseServer();
   const status = req.nextUrl.searchParams.get("status");
+  const deleted = req.nextUrl.searchParams.get("deleted");
+  const limit = Number(req.nextUrl.searchParams.get("limit") ?? "") || null;
 
-  let query = db
-    .from("posts")
-    .select("*")
-    .order("updated_at", { ascending: false });
+  let query = db.from("posts").select("*");
+
+  if (deleted === "true") {
+    query = query
+      .not("deleted_at", "is", null)
+      .order("deleted_at", { ascending: false });
+  } else {
+    query = query
+      .is("deleted_at", null)
+      .order("updated_at", { ascending: false });
+  }
 
   if (status) query = query.eq("status", status);
+  if (limit) query = query.limit(limit);
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

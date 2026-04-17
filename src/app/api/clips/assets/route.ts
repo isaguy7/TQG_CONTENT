@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import path from "node:path";
 import { readdir, stat } from "node:fs/promises";
+import { isHosted } from "@/lib/environment";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,6 +38,15 @@ async function listFiles(
 }
 
 export async function GET() {
+  if (isHosted()) {
+    return NextResponse.json({
+      recitations: [],
+      backgrounds: [],
+      recitations_dir: "(hosted — local folders unavailable)",
+      backgrounds_dir: "(hosted — local folders unavailable)",
+      hosted: true,
+    });
+  }
   const [recitations, backgrounds] = await Promise.all([
     listFiles(RECITATIONS_DIR, AUDIO_EXT),
     listFiles(BACKGROUNDS_DIR, VIDEO_EXT),

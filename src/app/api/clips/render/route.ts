@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
 import { stat, mkdir } from "node:fs/promises";
-import { renderClip } from "@/lib/clip-renderer";
 import { getSupabaseServer } from "@/lib/supabase";
+import { getClipPlatform, type ClipPlatformId } from "@/lib/clip-platforms";
+import { ffmpegAvailable } from "@/lib/environment";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,6 +13,10 @@ type RenderRequestClip = {
   start_time: number;
   end_time: number;
   background_video: string;
+  /** Optional: lets each clip pick its own recitation (mixed-batch mode). */
+  recitation_audio?: string;
+  /** Optional: target platform preset (x, instagram_reels, youtube_shorts, facebook). */
+  platform?: ClipPlatformId;
   subtitles: Array<{
     start: number;
     end: number;
@@ -23,8 +28,11 @@ type RenderRequestClip = {
 
 type RenderRequest = {
   batch_name?: string;
-  recitation_audio: string;
+  /** Fallback recitation used by any clip that didn't specify its own. */
+  recitation_audio?: string;
   watermark?: string | null;
+  /** Default platform preset for clips that don't specify one. */
+  platform?: ClipPlatformId;
   clips: RenderRequestClip[];
 };
 
@@ -40,23 +48,35 @@ async function exists(p: string): Promise<boolean> {
 }
 
 export async function POST(req: NextRequest) {
+  if (!ffmpegAvailable()) {
+    return NextResponse.json(
+      {
+        error:
+          "Clip rendering requires the local desktop app with GPU access.",
+      },
+      { status: 501 }
+    );
+  }
+  // Dynamic import keeps ffmpeg/spawn out of the Edge bundle on Vercel.
+  const { renderClip } = await import("@/lib/clip-renderer");
+
   let body: RenderRequest;
   try {
     body = (await req.json()) as RenderRequest;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  if (!body.recitation_audio || !Array.isArray(body.clips) || body.clips.length === 0) {
-    return NextResponse.json(
-      { error: "Missing recitation_audio or clips" },
-      { status: 400 }
-    );
+  if (!Array.isArray(body.clips) || body.clips.length === 0) {
+    return NextResponse.json({ error: "Missing clips" }, { status: 400 });
   }
-  if (!(await exists(body.recitation_audio))) {
-    return NextResponse.json(
-      { error: `Recitation audio not found: ${body.recitation_audio}` },
-      { status: 400 }
-    );
+  // Each clip must have either its own recitation or inherit the batch default.
+  for (const [i, c] of body.clips.entries()) {
+    if (!c.recitation_audio && !body.recitation_audio) {
+      return NextResponse.json(
+        { error: `Clip ${i + 1}: no recitation_audio (set per-clip or batch default)` },
+        { status: 400 }
+      );
+    }
   }
 
   const rendersDir = path.resolve(process.cwd(), RENDERS_DIR);
@@ -87,14 +107,22 @@ export async function POST(req: NextRequest) {
       if (!(await exists(clip.background_video))) {
         throw new Error(`Background video not found: ${clip.background_video}`);
       }
+      const recitation = clip.recitation_audio || body.recitation_audio!;
+      if (!(await exists(recitation))) {
+        throw new Error(`Recitation audio not found: ${recitation}`);
+      }
+      const platform = getClipPlatform(clip.platform || body.platform);
       await renderClip({
         backgroundVideo: clip.background_video,
-        recitationAudio: body.recitation_audio,
+        recitationAudio: recitation,
         subtitles: clip.subtitles,
         watermarkPath: body.watermark || null,
         startTime: clip.start_time,
         endTime: clip.end_time,
         outputPath: outPath,
+        width: platform.width,
+        height: platform.height,
+        maxSeconds: platform.maxSeconds,
       });
       results.push({ output: outPath, ok: true });
     } catch (err) {

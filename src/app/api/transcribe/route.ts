@@ -4,6 +4,7 @@ import { extractAudioForWhisper } from "@/lib/ffmpeg";
 import { transcribe } from "@/lib/whisper";
 import { fetchYoutubeCaptions } from "@/lib/captions";
 import type { WhisperResult, WhisperSegment } from "@/lib/transcript";
+import { isHosted } from "@/lib/environment";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,6 +46,16 @@ function encodeLine(ev: Event): Uint8Array {
 }
 
 export async function POST(req: NextRequest) {
+  if (isHosted()) {
+    return new Response(
+      JSON.stringify({
+        error:
+          "Video transcription requires the local desktop app with GPU access. YouTube captions are still available on local runs.",
+      }),
+      { status: 501, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
   let body: { url?: string; forceWhisper?: boolean };
   try {
     body = await req.json();

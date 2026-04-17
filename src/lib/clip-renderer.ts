@@ -18,9 +18,13 @@ export type ClipRenderOptions = {
   endTime: number;
   outputPath: string;
   useNvenc?: boolean;
+  // Platform preset — defaults to 1080×1080 / 20s (X / Facebook square).
+  width?: number;
+  height?: number;
+  maxSeconds?: number;
 };
 
-const MAX_CLIP_SECONDS = 20;
+const DEFAULT_MAX_CLIP_SECONDS = 60;
 
 function tailLines(s: string, n: number): string {
   return s.split(/\r?\n/).filter(Boolean).slice(-n).join("\n");
@@ -31,20 +35,26 @@ export async function renderClip(options: ClipRenderOptions): Promise<void> {
   if (!Number.isFinite(duration) || duration <= 0) {
     throw new Error("Clip duration must be > 0");
   }
-  if (duration > MAX_CLIP_SECONDS) {
+  const maxSeconds = options.maxSeconds ?? DEFAULT_MAX_CLIP_SECONDS;
+  if (duration > maxSeconds) {
     throw new Error(
-      `Clip duration ${duration.toFixed(2)}s exceeds ${MAX_CLIP_SECONDS}s limit`
+      `Clip duration ${duration.toFixed(2)}s exceeds ${maxSeconds}s limit`
     );
   }
+
+  const width = options.width ?? 1080;
+  const height = options.height ?? 1080;
 
   const outDir = path.dirname(options.outputPath);
   await mkdir(outDir, { recursive: true });
 
-  let subtitlePath = options.subtitleFile;
-  if (!subtitlePath) {
+  let subtitlePath: string;
+  if (options.subtitleFile) {
+    subtitlePath = options.subtitleFile;
+  } else {
     const ass = buildAssSubtitles(options.subtitles, {
-      width: 1080,
-      height: 1080,
+      width,
+      height,
     });
     subtitlePath = path.join(outDir, `${path.basename(options.outputPath, path.extname(options.outputPath))}.ass`);
     await writeFile(subtitlePath, ass, "utf-8");
@@ -53,12 +63,11 @@ export async function renderClip(options: ClipRenderOptions): Promise<void> {
   const videoEncoder = options.useNvenc !== false ? "h264_nvenc" : "libx264";
 
   // Build filter graph:
-  //   [bg] crop/scale to 1080x1080, pad, trim to duration
-  //   apply .ass subtitles
+  //   [bg] scale to target aspect + crop, apply .ass subtitles
   //   optional watermark overlay bottom-right at 90% margin
   const filters: string[] = [];
   filters.push(
-    "[0:v]scale=1080:1080:force_original_aspect_ratio=increase,crop=1080:1080,setsar=1[bg]"
+    `[0:v]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},setsar=1[bg]`
   );
 
   // Escape path for ffmpeg subtitles filter (Windows + Linux).

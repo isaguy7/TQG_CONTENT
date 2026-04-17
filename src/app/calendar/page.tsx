@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PageShell } from "@/components/PageShell";
 import { cn } from "@/lib/utils";
@@ -28,7 +28,9 @@ type CalendarResp = {
     scheduled_for: string | null;
     published_at: string | null;
     figure_id: string | null;
+    labels: string[] | null;
   }>;
+  month: string;
 };
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -39,47 +41,174 @@ const PLATFORM_COLORS: Record<string, string> = {
   facebook: "bg-indigo-500/20 text-indigo-300 border-indigo-400/30",
 };
 
+function parseMonth(m: string): { year: number; month: number } {
+  const [y, mm] = m.split("-").map(Number);
+  return { year: y, month: mm - 1 };
+}
+
+function formatMonth(year: number, month: number): string {
+  return `${year}-${String(month + 1).padStart(2, "0")}`;
+}
+
 export default function CalendarPage() {
   const [data, setData] = useState<CalendarResp | null>(null);
+  const today = useMemo(() => new Date(), []);
+  const [monthKey, setMonthKey] = useState(
+    formatMonth(today.getUTCFullYear(), today.getUTCMonth())
+  );
+
+  const load = useCallback(async () => {
+    const res = await fetch(`/api/calendar?month=${monthKey}`);
+    const j = (await res.json()) as CalendarResp;
+    setData(j);
+  }, [monthKey]);
 
   useEffect(() => {
-    fetch("/api/calendar")
-      .then((r) => r.json())
-      .then(setData)
-      .catch(() => setData(null));
-  }, []);
+    load();
+  }, [load]);
 
   const grid = useMemo(() => {
     if (!data) return null;
-    const start = new Date(data.calendar.week_start + "T00:00:00Z");
-    const days: Array<{ date: Date; posts: typeof data.posts }> = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(start);
-      d.setUTCDate(start.getUTCDate() + i);
+    const { year, month } = parseMonth(data.month);
+    const first = new Date(Date.UTC(year, month, 1));
+    const startDow = (first.getUTCDay() + 6) % 7; // Mon-start
+    const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+
+    const cells: Array<{
+      date: Date | null;
+      posts: typeof data.posts;
+    }> = [];
+
+    // leading blanks
+    for (let i = 0; i < startDow; i++) cells.push({ date: null, posts: [] });
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(Date.UTC(year, month, d));
       const dayPosts = data.posts.filter((p) => {
         const raw = p.published_at || p.scheduled_for;
         if (!raw) return false;
         const pd = new Date(raw);
         return (
-          pd.getUTCFullYear() === d.getUTCFullYear() &&
-          pd.getUTCMonth() === d.getUTCMonth() &&
-          pd.getUTCDate() === d.getUTCDate()
+          pd.getUTCFullYear() === date.getUTCFullYear() &&
+          pd.getUTCMonth() === date.getUTCMonth() &&
+          pd.getUTCDate() === date.getUTCDate()
         );
       });
-      days.push({ date: d, posts: dayPosts });
+      cells.push({ date, posts: dayPosts });
     }
-    return days;
+    // trailing blanks to complete final week
+    while (cells.length % 7 !== 0) cells.push({ date: null, posts: [] });
+    return cells;
+  }, [data]);
+
+  // Flag days where >3 days passed with no LinkedIn post.
+  const staleDays = useMemo(() => {
+    if (!data || !grid) return new Set<string>();
+    const stale = new Set<string>();
+    // Find every day cell that is in the past and count days since last
+    // LinkedIn activity; flag if >= 3.
+    const todayMid = new Date(
+      Date.UTC(
+        today.getUTCFullYear(),
+        today.getUTCMonth(),
+        today.getUTCDate()
+      )
+    );
+    const liDates = data.posts
+      .filter((p) => p.platform === "linkedin")
+      .map((p) => new Date(p.published_at || p.scheduled_for || 0))
+      .filter((d) => !isNaN(d.getTime()))
+      .sort((a, b) => a.getTime() - b.getTime());
+
+    for (const c of grid) {
+      if (!c.date) continue;
+      if (c.date.getTime() > todayMid.getTime()) continue;
+      const lastBefore = liDates
+        .filter((d) => d.getTime() <= c.date!.getTime())
+        .pop();
+      const days = lastBefore
+        ? Math.floor(
+            (c.date.getTime() - lastBefore.getTime()) / (24 * 3600 * 1000)
+          )
+        : Math.floor(
+            (c.date.getTime() - todayMid.getTime() + 30 * 24 * 3600 * 1000) /
+              (24 * 3600 * 1000)
+          );
+      if (days >= 3) stale.add(c.date.toISOString().slice(0, 10));
+    }
+    return stale;
+  }, [data, grid, today]);
+
+  const nextMonth = () => {
+    const { year, month } = parseMonth(monthKey);
+    const next = new Date(Date.UTC(year, month + 1, 1));
+    setMonthKey(formatMonth(next.getUTCFullYear(), next.getUTCMonth()));
+  };
+  const prevMonth = () => {
+    const { year, month } = parseMonth(monthKey);
+    const prev = new Date(Date.UTC(year, month - 1, 1));
+    setMonthKey(formatMonth(prev.getUTCFullYear(), prev.getUTCMonth()));
+  };
+
+  const monthLabel = useMemo(() => {
+    if (!data) return "";
+    const { year, month } = parseMonth(data.month);
+    return new Date(Date.UTC(year, month, 1)).toLocaleDateString("en-GB", {
+      month: "long",
+      year: "numeric",
+    });
   }, [data]);
 
   return (
     <PageShell
       title="Calendar"
-      description="Weekly grid, gap alerts, live counters"
+      description="Month grid, gap alerts, weekly targets"
+      actions={
+        <>
+          <button
+            onClick={prevMonth}
+            className="px-2 py-1 rounded text-[12px] border border-white/[0.08] text-white/70 hover:text-white hover:bg-white/[0.04]"
+          >
+            ←
+          </button>
+          <span className="text-[13px] text-white/80 px-2 min-w-[120px] text-center">
+            {monthLabel}
+          </span>
+          <button
+            onClick={nextMonth}
+            className="px-2 py-1 rounded text-[12px] border border-white/[0.08] text-white/70 hover:text-white hover:bg-white/[0.04]"
+          >
+            →
+          </button>
+        </>
+      }
     >
       {!data ? (
         <div className="text-[13px] text-white/40">Loading calendar…</div>
       ) : (
         <div className="space-y-4">
+          <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <TargetBar
+              label="LinkedIn originals"
+              actual={data.calendar.linkedin_originals_actual}
+              target={data.calendar.linkedin_originals_target}
+            />
+            <TargetBar
+              label="TQG reposts"
+              actual={data.calendar.tqg_reposts_actual}
+              target={data.calendar.tqg_reposts_target}
+            />
+            <TargetBar
+              label="X tweets"
+              actual={data.calendar.x_posts_actual}
+              target={data.calendar.x_posts_target}
+            />
+            <TargetBar
+              label="X clips"
+              actual={data.calendar.x_video_clips_actual}
+              target={data.calendar.x_video_clips_target}
+            />
+          </section>
+
           {data.alerts.length > 0 ? (
             <div className="rounded-lg bg-amber-500/[0.08] border border-amber-400/30 p-3 space-y-1">
               <div className="section-label text-amber-200">Gap alerts</div>
@@ -91,78 +220,102 @@ export default function CalendarPage() {
             </div>
           ) : null}
 
-          <div className="grid grid-cols-7 gap-2">
-            {grid?.map((d, i) => {
-              const dateStr = d.date.toISOString().slice(0, 10);
-              return (
+          <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] overflow-hidden">
+            <div className="grid grid-cols-7 bg-white/[0.03] border-b border-white/[0.06]">
+              {DAYS.map((d) => (
                 <div
-                  key={dateStr}
-                  className="rounded-md border border-white/[0.06] bg-white/[0.02] p-2 min-h-[140px]"
+                  key={d}
+                  className="px-2 py-1.5 text-[10px] uppercase tracking-wider text-white/45 text-center"
                 >
-                  <div className="flex items-baseline justify-between mb-2">
-                    <span className="text-[10px] uppercase tracking-wider text-white/50">
-                      {DAYS[i]}
-                    </span>
-                    <span className="text-[11px] tabular-nums text-white/70">
-                      {d.date.getUTCDate()}
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    {d.posts.length === 0 ? (
-                      <Link
-                        href="/content/new"
-                        className="block text-[10px] text-white/30 hover:text-white/60 border border-dashed border-white/[0.08] rounded px-1.5 py-1 text-center"
-                      >
-                        + Post
-                      </Link>
-                    ) : (
-                      d.posts.map((p) => (
-                        <Link
-                          key={p.id}
-                          href={`/content/${p.id}`}
-                          className={cn(
-                            "block text-[11px] px-1.5 py-1 rounded border truncate",
-                            PLATFORM_COLORS[p.platform] ||
-                              "bg-white/[0.05] text-white/70 border-white/[0.1]"
-                          )}
-                          title={p.title || "(untitled)"}
-                        >
-                          {p.title || "(untitled)"}
-                        </Link>
-                      ))
-                    )}
-                  </div>
+                  {d}
                 </div>
-              );
-            })}
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <TargetBox
-              label="LinkedIn originals"
-              actual={data.calendar.linkedin_originals_actual}
-              target={data.calendar.linkedin_originals_target}
-            />
-            <TargetBox
-              label="TQG reposts"
-              actual={data.calendar.tqg_reposts_actual}
-              target={data.calendar.tqg_reposts_target}
-            />
-            <TargetBox
-              label="X tweets"
-              actual={data.calendar.x_posts_actual}
-              target={data.calendar.x_posts_target}
-            />
-            <TargetBox
-              label="X clips"
-              actual={data.calendar.x_video_clips_actual}
-              target={data.calendar.x_video_clips_target}
-            />
+              ))}
+            </div>
+            <div className="grid grid-cols-7">
+              {grid?.map((c, i) => {
+                if (!c.date) {
+                  return (
+                    <div
+                      key={`blank-${i}`}
+                      className="min-h-[96px] border-r border-b border-white/[0.04] bg-white/[0.01]"
+                    />
+                  );
+                }
+                const dateStr = c.date.toISOString().slice(0, 10);
+                const isToday =
+                  dateStr ===
+                  today.toISOString().slice(0, 10);
+                const isPast = c.date < today;
+                const isStale = staleDays.has(dateStr);
+                return (
+                  <div
+                    key={dateStr}
+                    className={cn(
+                      "min-h-[96px] p-1.5 border-r border-b border-white/[0.04] text-[11px]",
+                      isToday && "ring-1 ring-primary-bright/40 bg-primary/5",
+                      isStale &&
+                        c.posts.length === 0 &&
+                        "bg-amber-500/[0.05]"
+                    )}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span
+                        className={cn(
+                          "tabular-nums",
+                          isToday
+                            ? "text-primary-bright font-semibold"
+                            : "text-white/65"
+                        )}
+                      >
+                        {c.date.getUTCDate()}
+                      </span>
+                      {isStale && c.posts.length === 0 ? (
+                        <span
+                          className="text-[9px] text-amber-300/80"
+                          title="3+ days without LinkedIn activity"
+                        >
+                          !
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="space-y-0.5">
+                      {c.posts.length === 0 ? (
+                        !isPast ? (
+                          <Link
+                            href={`/content/new?date=${dateStr}`}
+                            className="block text-[10px] text-white/25 hover:text-white/60 border border-dashed border-white/[0.06] rounded px-1 py-0.5 text-center"
+                          >
+                            +
+                          </Link>
+                        ) : null
+                      ) : (
+                        c.posts.map((p) => (
+                          <Link
+                            key={p.id}
+                            href={`/content/${p.id}`}
+                            className={cn(
+                              "block text-[10px] px-1 py-0.5 rounded border truncate",
+                              PLATFORM_COLORS[p.platform] ||
+                                "bg-white/[0.05] text-white/70 border-white/[0.1]"
+                            )}
+                            title={p.title || "(untitled)"}
+                          >
+                            {p.title || "(untitled)"}
+                          </Link>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {data.calendar.figures_covered.length > 0 ? (
             <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
-              <div className="section-label mb-2">Figures covered this week</div>
+              <div className="section-label mb-2">
+                Figures covered this week
+              </div>
               <div className="flex flex-wrap gap-1.5">
                 {data.calendar.figures_covered.map((f) => (
                   <span
@@ -181,7 +334,7 @@ export default function CalendarPage() {
   );
 }
 
-function TargetBox({
+function TargetBar({
   label,
   actual,
   target,
@@ -190,17 +343,29 @@ function TargetBox({
   actual: number;
   target: number;
 }) {
+  const pct = target > 0 ? Math.min(100, (actual / target) * 100) : 0;
   const done = actual >= target;
   return (
     <div className="rounded-md border border-white/[0.06] bg-white/[0.02] p-3">
-      <div className="text-[11px] text-white/50 mb-1">{label}</div>
-      <div
-        className={cn(
-          "text-[16px] font-semibold tabular-nums",
-          done ? "text-primary-bright" : "text-white/85"
-        )}
-      >
-        {actual}/{target}
+      <div className="flex items-baseline justify-between">
+        <div className="text-[11px] text-white/50">{label}</div>
+        <div
+          className={cn(
+            "text-[13px] font-semibold tabular-nums",
+            done ? "text-primary-bright" : "text-white/85"
+          )}
+        >
+          {actual}/{target}
+        </div>
+      </div>
+      <div className="mt-2 h-1.5 rounded-full bg-white/[0.05] overflow-hidden">
+        <div
+          className={cn(
+            "h-full transition-all",
+            done ? "bg-primary-bright" : "bg-white/50"
+          )}
+          style={{ width: `${pct}%` }}
+        />
       </div>
     </div>
   );

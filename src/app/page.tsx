@@ -1,12 +1,12 @@
 import { PageShell } from "@/components/PageShell";
 import { MetricCard } from "@/components/MetricCard";
-import { PlatformCard } from "@/components/PlatformCard";
 import { RecentPostsList, type RecentPost } from "@/components/RecentPostsList";
 import { HookPerformance } from "@/components/WeeklyTargets";
 import {
   LiveWeeklyAndAlerts,
   FigureRecommendation,
 } from "@/components/DashboardLive";
+import { IntegrationsBar } from "@/components/IntegrationsBar";
 import Link from "next/link";
 
 const recentPosts: RecentPost[] = [
@@ -90,54 +90,17 @@ export default function DashboardPage() {
         />
       </section>
 
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <PlatformCard
-          platform="LinkedIn Personal"
-          handle="@isakhan"
-          followers="1,900"
-          metrics={[
-            { label: "Impressions", value: "8.4k" },
-            { label: "Clicks", value: "312" },
-            { label: "Engagement", value: "3.8%" },
-            { label: "Growth/wk", value: "+42" },
-          ]}
-        />
-        <PlatformCard
-          platform="TQG LinkedIn Page"
-          handle="The Quran Group"
-          followers="528"
-          metrics={[
-            { label: "Impressions", value: "2.1k" },
-            { label: "Clicks", value: "48" },
-            { label: "Engagement", value: "2.1%" },
-            { label: "Growth/wk", value: "+11" },
-          ]}
-        />
-        <PlatformCard
-          platform="X / TQG"
-          handle="@TheQuranGroup"
-          followers="13"
-          metrics={[
-            { label: "Impressions", value: "1.2k" },
-            { label: "Best tweet", value: "284" },
-            { label: "Mode", value: "Singles" },
-            { label: "Threads at", value: "1,000" },
-          ]}
-          footnote="Threads deferred until 1k followers. Daily single + image at 12pm BST."
-          footnoteTone="muted"
-        />
-        <PlatformCard
-          platform="Instagram / Facebook"
-          handle="Cross-posted Reels"
-          metrics={[
-            { label: "Reels posted", value: "4" },
-            { label: "Impressions", value: "708" },
-            { label: "Strategy", value: "Cross-post" },
-            { label: "Priority", value: "Low" },
-          ]}
-          footnote="Meta Business Suite scheduler."
-          footnoteTone="muted"
-        />
+      <section className="mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <span className="section-label">Connected platforms</span>
+          <Link
+            href="/settings"
+            className="text-[11px] text-white/40 hover:text-white/70"
+          >
+            Manage in Settings →
+          </Link>
+        </div>
+        <IntegrationsBar />
       </section>
 
       <section className="grid grid-cols-1 lg:grid-cols-5 gap-3">

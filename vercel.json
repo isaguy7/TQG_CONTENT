@@ -1,0 +1,16 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "env": {
+    "NEXT_PUBLIC_SUPABASE_URL": "@supabase-url",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase-anon-key",
+    "SUPABASE_SERVICE_ROLE_KEY": "@supabase-service-role-key",
+    "ANTHROPIC_API_KEY": "@anthropic-api-key",
+    "ANTHROPIC_MODEL": "claude-sonnet-4-20250514",
+    "API_MONTHLY_CAP": "5",
+    "TYPEFULLY_API_KEY": "@typefully-api-key",
+    "TYPEFULLY_SOCIAL_SET_ID": "@typefully-social-set-id",
+    "UNSPLASH_ACCESS_KEY": "@unsplash-access-key"
+  }
+}
