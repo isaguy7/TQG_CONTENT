@@ -1,4 +1,5 @@
 import { PageShell } from "@/components/PageShell";
+import { ClaudeUsage } from "@/components/ClaudeUsage";
 
 export default function SettingsPage() {
   return (
@@ -15,6 +16,12 @@ export default function SettingsPage() {
             for keys.
           </p>
         </section>
+
+        <section className="rounded-lg border border-border bg-surface p-6">
+          <h2 className="text-sm font-semibold mb-3">Claude API usage</h2>
+          <ClaudeUsage />
+        </section>
+
         <section className="rounded-lg border border-border bg-surface p-6">
           <h2 className="text-sm font-semibold mb-2">
             yt-dlp upgrade (Phase 1+)

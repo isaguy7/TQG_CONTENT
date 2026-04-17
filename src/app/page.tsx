@@ -2,8 +2,11 @@ import { PageShell } from "@/components/PageShell";
 import { MetricCard } from "@/components/MetricCard";
 import { PlatformCard } from "@/components/PlatformCard";
 import { RecentPostsList, type RecentPost } from "@/components/RecentPostsList";
-import { WeeklyTargets, HookPerformance } from "@/components/WeeklyTargets";
-import { GapAlert } from "@/components/GapAlert";
+import { HookPerformance } from "@/components/WeeklyTargets";
+import {
+  LiveWeeklyAndAlerts,
+  FigureRecommendation,
+} from "@/components/DashboardLive";
 import Link from "next/link";
 
 const recentPosts: RecentPost[] = [
@@ -52,12 +55,6 @@ const recentPosts: RecentPost[] = [
     engagementRate: 3.4,
     tier1: true,
   },
-];
-
-const gapAlerts = [
-  "No X clip posted in the last 3 days — algorithm momentum cooling.",
-  "3 Sahabah posts in a row. Next post: surface a Prophet or scholar.",
-  "TQG Page has 0 posts this week (target: 3).",
 ];
 
 export default function DashboardPage() {
@@ -148,17 +145,9 @@ export default function DashboardPage() {
           <RecentPostsList posts={recentPosts} />
         </div>
         <div className="lg:col-span-2 space-y-3">
-          <WeeklyTargets
-            targets={[
-              { label: "LinkedIn originals", actual: 1, target: 2 },
-              { label: "TQG reposts", actual: 2, target: 3 },
-              { label: "X tweets", actual: 4, target: 7 },
-              { label: "X clips", actual: 0, target: 3 },
-              { label: "IG / FB Reels", actual: 0, target: 3 },
-            ]}
-          />
+          <LiveWeeklyAndAlerts />
           <HookPerformance tier1Avg={4117} tier2Avg={475} />
-          <GapAlert messages={gapAlerts} />
+          <FigureRecommendation />
           <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
             <div className="section-label mb-3">Quick create</div>
             <div className="space-y-1.5">

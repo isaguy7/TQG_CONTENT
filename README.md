@@ -49,14 +49,19 @@ Opens at [http://localhost:3000](http://localhost:3000).
 
 ## Build phases
 
-| Phase | Scope                                    | Est.        |
-| ----- | ---------------------------------------- | ----------- |
-| 0     | Scaffold, Supabase, sidebar nav          | 1-2h        |
-| 1     | yt-dlp + WhisperX + transcript viewer    | 5-7h        |
-| 2     | Hadith verification kernel               | 3-4h        |
-| 3     | 10-15 starter Islamic figures            | 3-4h        |
-| 4     | Quran local corpus + fuzzy matcher       | 3-5h        |
-| 5     | Short-form clip batch creator (ship v1)  | 8-10h       |
+| Phase | Scope                                          | Est.        |
+| ----- | ---------------------------------------------- | ----------- |
+| 0     | Scaffold, Supabase, sidebar nav                | 1-2h        |
+| 1     | yt-dlp + WhisperX + transcript viewer          | 5-7h        |
+| 2     | Hadith verification kernel                     | 3-4h        |
+| 3     | 10-15 starter Islamic figures                  | 3-4h        |
+| 3.5   | Hadith corpus (29,685 across 5 collections)    | 3-4h        |
+| 4     | Quran local corpus + fuzzy matcher             | 3-5h        |
+| 5     | Claude API in-app (hooks, convert, slop check) | 3-4h        |
+| 6     | Short-form clip batch creator                  | 8-10h       |
+| 7     | Typefully integration (push drafts)            | 2-3h        |
+| 8     | Content calendar + gap alerts + recommender    | 3-4h        |
+| 9     | Unsplash image search                          | 1-2h        |
 
 V2 (post-ship, after 4 weeks of usage data): long-form video editor,
 platform converter, content calendar alerts, Claude API integration.

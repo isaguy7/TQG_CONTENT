@@ -21,6 +21,10 @@ import {
   linkedinToInstagram,
   linkedinToX,
 } from "@/lib/platform-convert";
+import { HookGenerator } from "@/components/HookGenerator";
+import { SlopChecker } from "@/components/SlopChecker";
+import { TypefullyPush } from "@/components/TypefullyPush";
+import { ImagePicker } from "@/components/ImagePicker";
 
 type PostStatus =
   | "idea"
@@ -38,6 +42,8 @@ type Post = {
   platform: string;
   figure_id: string | null;
   hook_selected: string | null;
+  image_url: string | null;
+  image_rationale: string | null;
   updated_at: string;
 };
 
@@ -455,6 +461,39 @@ export default function PostEditorPage() {
             <ConvertPreviews content={draft} />
           ) : null}
         </div>
+
+        <HookGenerator
+          postId={post.id}
+          onPick={(h) => {
+            save({ hook_selected: h.text });
+            if (!draft.trim()) {
+              setDraft(h.text + "\n\n");
+            } else {
+              setDraft(h.text + "\n\n" + draft);
+            }
+          }}
+        />
+
+        <SlopChecker content={draft} postId={post.id} />
+
+        <ImagePicker
+          imageUrl={post.image_url}
+          imageRationale={post.image_rationale}
+          onChange={(image_url, image_rationale) => {
+            save({ image_url, image_rationale });
+            setPost({ ...post, image_url, image_rationale });
+          }}
+        />
+
+        <TypefullyPush
+          postId={post.id}
+          content={draft}
+          platform={post.platform}
+          imageUrl={post.image_url}
+          onScheduled={() => {
+            save({ status: "scheduled" });
+          }}
+        />
 
         <section className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
           <div className="flex items-center justify-between mb-3">
