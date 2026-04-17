@@ -25,6 +25,7 @@ import { HookGenerator } from "@/components/HookGenerator";
 import { SlopChecker } from "@/components/SlopChecker";
 import { TypefullyPush } from "@/components/TypefullyPush";
 import { ImagePicker } from "@/components/ImagePicker";
+import { FigureAvailableRefs } from "@/components/FigureAvailableRefs";
 
 type PostStatus =
   | "idea"
@@ -196,7 +197,13 @@ export default function PostEditorPage() {
   };
 
   const deletePost = async () => {
-    if (!confirm("Delete this draft?")) return;
+    if (
+      !confirm(
+        "Move this draft to trash? You can restore it within 7 days."
+      )
+    ) {
+      return;
+    }
     await fetch(`/api/posts/${postId}`, { method: "DELETE" });
     router.push("/content");
   };
@@ -470,6 +477,16 @@ export default function PostEditorPage() {
             </div>
           ) : null}
         </div>
+
+        {figure ? (
+          <FigureAvailableRefs
+            figureId={figure.id}
+            figureName={figure.name_en}
+            postId={post.id}
+            attachedHadithIds={attachedIds}
+            onAttachedHadith={loadPost}
+          />
+        ) : null}
 
         <HookGenerator
           postId={post.id}
