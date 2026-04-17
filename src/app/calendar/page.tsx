@@ -41,12 +41,16 @@ const PLATFORM_COLORS: Record<string, string> = {
 
 export default function CalendarPage() {
   const [data, setData] = useState<CalendarResp | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/calendar")
-      .then((r) => r.json())
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then(setData)
-      .catch(() => setData(null));
+      .catch((err: Error) => setError(err.message));
   }, []);
 
   const grid = useMemo(() => {
@@ -76,10 +80,28 @@ export default function CalendarPage() {
       title="Calendar"
       description="Weekly grid, gap alerts, live counters"
     >
-      {!data ? (
+      {error ? (
+        <div className="rounded-lg bg-danger/[0.08] border border-danger/40 p-4 text-[13px] text-white/80">
+          Failed to load calendar: {error}
+        </div>
+      ) : !data ? (
         <div className="text-[13px] text-white/40">Loading calendar…</div>
       ) : (
         <div className="space-y-4">
+          <div className="flex items-baseline justify-between">
+            <div className="text-[13px] text-white/70">
+              Week of{" "}
+              <span className="text-white/95 font-medium">
+                {formatWeek(data.calendar.week_start)}
+              </span>
+            </div>
+            <Link
+              href="/content/new"
+              className="px-3 py-1.5 rounded-md text-[12px] font-medium bg-primary text-primary-foreground hover:bg-primary-hover"
+            >
+              + New post
+            </Link>
+          </div>
           {data.alerts.length > 0 ? (
             <div className="rounded-lg bg-amber-500/[0.08] border border-amber-400/30 p-3 space-y-1">
               <div className="section-label text-amber-200">Gap alerts</div>
@@ -179,6 +201,23 @@ export default function CalendarPage() {
       )}
     </PageShell>
   );
+}
+
+function formatWeek(iso: string): string {
+  try {
+    const start = new Date(iso + "T00:00:00Z");
+    const end = new Date(start);
+    end.setUTCDate(start.getUTCDate() + 6);
+    const fmt = (d: Date) =>
+      d.toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        timeZone: "UTC",
+      });
+    return `${fmt(start)} – ${fmt(end)}`;
+  } catch {
+    return iso;
+  }
 }
 
 function TargetBox({

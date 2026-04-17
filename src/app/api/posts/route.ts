@@ -7,6 +7,9 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const db = getSupabaseServer();
   const status = req.nextUrl.searchParams.get("status");
+  const figureId = req.nextUrl.searchParams.get("figure_id");
+  const limitParam = req.nextUrl.searchParams.get("limit");
+  const limit = limitParam ? Math.max(1, Math.min(200, Number(limitParam))) : null;
 
   let query = db
     .from("posts")
@@ -14,6 +17,8 @@ export async function GET(req: NextRequest) {
     .order("updated_at", { ascending: false });
 
   if (status) query = query.eq("status", status);
+  if (figureId) query = query.eq("figure_id", figureId);
+  if (limit) query = query.limit(limit);
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
