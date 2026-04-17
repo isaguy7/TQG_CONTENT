@@ -1,5 +1,10 @@
 import type { WhisperResult } from "@/lib/transcript";
 import { transcriptToText } from "@/lib/transcript";
+import {
+  getPlatform,
+  platformPromptBlock,
+  type PlatformId,
+} from "@/lib/platform-rules";
 
 /**
  * The TQG writing rules distilled from 250+ turns of content iteration.
@@ -36,6 +41,7 @@ export type SystemPromptInput = {
   figure?: FigureContext | null;
   topic?: string | null;
   instruction?: string;
+  platform?: PlatformId | string | null;
 };
 
 const DEFAULT_INSTRUCTION = `Draft a LinkedIn post about {topic}.
@@ -45,6 +51,11 @@ character). Then I'll pick one and we'll iterate on the draft.`;
 
 export function buildSystemPrompt(input: SystemPromptInput): string {
   const parts: string[] = [WRITING_RULES];
+
+  if (input.platform) {
+    const cfg = getPlatform(input.platform);
+    parts.push(`\n=== PLATFORM ===\n${platformPromptBlock(cfg)}`);
+  }
 
   if (input.transcript) {
     const text =

@@ -41,6 +41,7 @@ next-env.d.ts
 /recitations/
 /renders/
 /data/quran/*.json
+/data/hadith/
 
 # Python caches (Phase 1 WhisperX)
 __pycache__/

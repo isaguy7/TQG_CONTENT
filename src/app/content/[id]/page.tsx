@@ -5,7 +5,22 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { PageShell } from "@/components/PageShell";
 import { cn } from "@/lib/utils";
-import type { HadithRecord } from "@/components/HadithPanel";
+import {
+  SearchCorpus,
+  type HadithRecord,
+} from "@/components/HadithPanel";
+import {
+  PLATFORMS,
+  counterTone,
+  getPlatform,
+  type PlatformId,
+} from "@/lib/platform-rules";
+import { buildSystemPrompt, type FigureContext } from "@/lib/system-prompt";
+import {
+  linkedinToFacebook,
+  linkedinToInstagram,
+  linkedinToX,
+} from "@/lib/platform-convert";
 
 type PostStatus =
   | "idea"
@@ -26,17 +41,32 @@ type Post = {
   updated_at: string;
 };
 
+type Figure = {
+  id: string;
+  name_en: string;
+  name_ar?: string | null;
+  title?: string | null;
+  bio_short?: string | null;
+  themes?: string[] | null;
+  notable_events?: unknown;
+};
+
 export default function PostEditorPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const postId = params.id;
 
   const [post, setPost] = useState<Post | null>(null);
+  const [figure, setFigure] = useState<Figure | null>(null);
   const [attached, setAttached] = useState<HadithRecord[]>([]);
   const [allHadith, setAllHadith] = useState<HadithRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [copyMsg, setCopyMsg] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [corpusOpen, setCorpusOpen] = useState(false);
+  const [convertOpen, setConvertOpen] = useState(false);
   const [publishMsg, setPublishMsg] = useState<
     | { ok: true }
     | { ok: false; message: string; unverified?: Array<{ id: string; reference_text: string }> }
@@ -55,10 +85,22 @@ export default function PostEditorPage() {
         hadith_refs: HadithRecord[];
       };
       setPost(post);
+      setDraft(post.final_content || "");
       setAttached(hadith_refs || []);
       if (hadithRes.ok) {
         const { hadith } = (await hadithRes.json()) as { hadith: HadithRecord[] };
         setAllHadith(hadith);
+      }
+      if (post.figure_id) {
+        const fRes = await fetch(`/api/figures/${post.figure_id}`).catch(
+          () => null
+        );
+        if (fRes && fRes.ok) {
+          const { figure } = (await fRes.json()) as { figure: Figure };
+          setFigure(figure);
+        }
+      } else {
+        setFigure(null);
       }
       setError(null);
     } catch (err) {
@@ -149,13 +191,50 @@ export default function PostEditorPage() {
     router.push("/content");
   };
 
+  const copyForClaude = async () => {
+    if (!post) return;
+    try {
+      const figureCtx: FigureContext | null = figure
+        ? {
+            nameEn: figure.name_en,
+            nameAr: figure.name_ar || null,
+            title: figure.title || null,
+            bioShort: figure.bio_short || null,
+            themes: figure.themes || null,
+            notableEvents: figure.notable_events,
+          }
+        : null;
+      const prompt = buildSystemPrompt({
+        platform: post.platform,
+        figure: figureCtx,
+        topic: post.title,
+      });
+      await navigator.clipboard.writeText(prompt);
+      setCopyMsg("Copied to clipboard");
+      setTimeout(() => setCopyMsg(null), 1800);
+    } catch (err) {
+      setCopyMsg(`Copy failed: ${(err as Error).message}`);
+      setTimeout(() => setCopyMsg(null), 2500);
+    }
+  };
+
   const attachedIds = useMemo(() => new Set(attached.map((h) => h.id)), [attached]);
   const availableHadith = useMemo(
     () => allHadith.filter((h) => !attachedIds.has(h.id)),
     [allHadith, attachedIds]
   );
-
   const unverifiedAttached = attached.filter((h) => !h.verified);
+
+  const platformCfg = useMemo(
+    () => getPlatform(post?.platform),
+    [post?.platform]
+  );
+  const charCount = draft.length;
+  const tone = counterTone(charCount, platformCfg);
+  const pct = Math.min(100, (charCount / platformCfg.charLimit) * 100);
+  const visiblePreview =
+    draft.slice(0, platformCfg.visibleBefore) +
+    (draft.length > platformCfg.visibleBefore ? "…" : "");
 
   if (loading) {
     return (
@@ -181,10 +260,27 @@ export default function PostEditorPage() {
     );
   }
 
+  const counterColor =
+    tone === "over"
+      ? "text-danger"
+      : tone === "warn"
+        ? "text-amber-400"
+        : tone === "optimal"
+          ? "text-emerald-400"
+          : "text-white/60";
+  const barColor =
+    tone === "over"
+      ? "bg-danger"
+      : tone === "warn"
+        ? "bg-amber-400"
+        : tone === "optimal"
+          ? "bg-emerald-400"
+          : "bg-white/40";
+
   return (
     <PageShell
       title={post.title || "Untitled draft"}
-      description={`${post.platform} · ${post.status}`}
+      description={`${platformCfg.label} · ${post.status}`}
       actions={
         <>
           {saveMsg ? (
@@ -192,6 +288,17 @@ export default function PostEditorPage() {
               {saveMsg}
             </span>
           ) : null}
+          {copyMsg ? (
+            <span className="text-[11px] text-primary-bright self-center mr-2">
+              {copyMsg}
+            </span>
+          ) : null}
+          <button
+            onClick={copyForClaude}
+            className="px-3 py-1.5 rounded text-[12px] border border-white/[0.08] text-white/85 hover:text-white hover:bg-white/[0.04]"
+          >
+            Copy to Claude
+          </button>
           <button
             onClick={deletePost}
             className="px-3 py-1.5 rounded text-[12px] border border-white/[0.08] text-white/50 hover:text-danger hover:border-danger/40"
@@ -201,35 +308,121 @@ export default function PostEditorPage() {
         </>
       }
     >
-      <div className="max-w-3xl space-y-6">
-        <section className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
-          <label className="section-label block mb-2">Title</label>
+      <div className="max-w-2xl mx-auto space-y-6">
+        {figure ? (
+          <div className="flex items-center justify-center">
+            <Link
+              href={`/figures`}
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/[0.08] bg-white/[0.03] text-[11px] text-white/70 hover:text-white hover:bg-white/[0.05]"
+            >
+              <span className="text-white/40">About:</span>
+              <span className="font-medium">{figure.name_en}</span>
+              {figure.name_ar ? (
+                <span className="text-white/40">· {figure.name_ar}</span>
+              ) : null}
+            </Link>
+          </div>
+        ) : null}
+
+        <div>
           <input
-            defaultValue={post.title || ""}
+            value={post.title || ""}
+            onChange={(e) => {
+              setPost({ ...post, title: e.target.value });
+            }}
             onBlur={(e) => save({ title: e.target.value })}
-            className="w-full bg-white/[0.03] border border-white/[0.08] rounded-md px-3 py-2 text-[13px] text-white/90 focus:outline-none focus:border-primary-hover/50"
+            placeholder="Title"
+            className="w-full bg-transparent border-0 text-center text-[18px] font-semibold text-white/90 placeholder-white/25 focus:outline-none"
           />
+        </div>
 
-          <label className="section-label block mt-4 mb-2">Draft</label>
+        <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-5">
           <textarea
-            defaultValue={post.final_content || ""}
-            onBlur={(e) => save({ final_content: e.target.value })}
-            placeholder="Paste or write the post body here."
-            className="w-full bg-white/[0.03] border border-white/[0.08] rounded-md px-3 py-2 text-[13px] text-white/90 placeholder-white/25 focus:outline-none focus:border-primary-hover/50 min-h-[280px] font-mono leading-relaxed resize-y"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={(e) => {
+              if (e.target.value !== (post.final_content || "")) {
+                save({ final_content: e.target.value });
+              }
+            }}
+            placeholder="Write the post body here. This is the main thing on the page."
+            className="w-full bg-transparent border-0 text-[14px] text-white/90 placeholder-white/25 focus:outline-none min-h-[340px] leading-relaxed resize-y"
           />
 
-          <div className="mt-4 flex items-center gap-4 text-[12px]">
+          <div className="mt-4 pt-3 border-t border-white/[0.06]">
+            <div className="flex items-center justify-between text-[12px]">
+              <div className="flex items-center gap-3">
+                <span className={cn("font-medium tabular-nums", counterColor)}>
+                  {charCount.toLocaleString()} / {platformCfg.charLimit.toLocaleString()}
+                </span>
+                <span className="text-white/40">
+                  optimal {platformCfg.optimalRange[0]}-
+                  {platformCfg.optimalRange[1]}
+                </span>
+              </div>
+              <span className={cn("text-[11px]", counterColor)}>
+                {tone === "over"
+                  ? "Over limit"
+                  : tone === "warn"
+                    ? "Past optimal"
+                    : tone === "optimal"
+                      ? "In the zone"
+                      : "Below optimal"}
+              </span>
+            </div>
+            <div className="mt-2 h-1.5 rounded-full bg-white/[0.05] overflow-hidden">
+              <div
+                className={cn("h-full transition-all", barColor)}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            {charCount > 0 ? (
+              <div className="mt-3 rounded-md border border-dashed border-white/10 bg-white/[0.02] p-2 text-[11px] text-white/55 leading-relaxed">
+                <span className="text-white/35 mr-1">
+                  First {platformCfg.visibleBefore} chars visible in feed:
+                </span>
+                <span className="text-white/80">
+                  {visiblePreview || "—"}
+                </span>
+              </div>
+            ) : null}
+
+            <details className="mt-3 text-[12px]">
+              <summary className="cursor-pointer text-white/55 hover:text-white/80">
+                {platformCfg.label} formatting tips
+              </summary>
+              <ul className="mt-2 space-y-1 text-white/70 leading-relaxed">
+                {platformCfg.formatNotes.map((n) => (
+                  <li key={n} className="pl-3 relative">
+                    <span className="absolute left-0 text-white/30">·</span>
+                    {n}
+                  </li>
+                ))}
+                <li className="pl-3 relative pt-1 text-white/50">
+                  <span className="absolute left-0 text-white/30">·</span>
+                  Hashtags: {platformCfg.hashtagAdvice}
+                </li>
+              </ul>
+            </details>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-4 text-[12px]">
             <label className="flex items-center gap-2">
               <span className="text-white/50">Platform:</span>
               <select
-                defaultValue={post.platform}
-                onChange={(e) => save({ platform: e.target.value })}
+                value={post.platform}
+                onChange={(e) => {
+                  const next = e.target.value as PlatformId;
+                  setPost({ ...post, platform: next });
+                  save({ platform: next });
+                }}
                 className="bg-white/[0.03] border border-white/[0.08] rounded px-2 py-1 text-white/85"
               >
-                <option value="linkedin">LinkedIn</option>
-                <option value="x">X</option>
-                <option value="instagram">Instagram</option>
-                <option value="facebook">Facebook</option>
+                {Object.values(PLATFORMS).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="flex items-center gap-2">
@@ -249,28 +442,62 @@ export default function PostEditorPage() {
                 <option value="published">published</option>
               </select>
             </label>
+            <div className="flex-1" />
+            <button
+              onClick={() => setConvertOpen((v) => !v)}
+              className="px-2.5 py-1 rounded text-[11px] border border-white/[0.08] text-white/70 hover:text-white hover:bg-white/[0.04]"
+            >
+              {convertOpen ? "Hide previews" : "Preview on other platforms"}
+            </button>
           </div>
-        </section>
+
+          {convertOpen ? (
+            <ConvertPreviews content={draft} />
+          ) : null}
+        </div>
 
         <section className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
           <div className="flex items-center justify-between mb-3">
             <span className="section-label">
               Hadith references ({attached.length})
             </span>
-            {unverifiedAttached.length > 0 ? (
-              <span className="text-[11px] text-danger">
-                {unverifiedAttached.length} unverified — blocks publish
-              </span>
-            ) : attached.length > 0 ? (
-              <span className="text-[11px] text-primary-bright">
-                All verified
-              </span>
-            ) : null}
+            <div className="flex items-center gap-2">
+              {unverifiedAttached.length > 0 ? (
+                <span className="text-[11px] text-danger">
+                  {unverifiedAttached.length} unverified — blocks publish
+                </span>
+              ) : attached.length > 0 ? (
+                <span className="text-[11px] text-primary-bright">
+                  All verified
+                </span>
+              ) : null}
+              <button
+                onClick={() => setCorpusOpen((v) => !v)}
+                className="px-2 py-1 rounded text-[11px] border border-white/[0.08] text-white/70 hover:text-white hover:bg-white/[0.04]"
+              >
+                {corpusOpen ? "Hide corpus" : "Search corpus"}
+              </button>
+            </div>
           </div>
+
+          {corpusOpen ? (
+            <div className="mb-4 rounded-md border border-white/[0.06] bg-white/[0.02] p-3">
+              <SearchCorpus
+                onAdded={() => {
+                  loadPost();
+                }}
+              />
+              <div className="mt-3 text-[11px] text-white/40">
+                Corpus Adds create an UNVERIFIED reference. Attach it to the
+                post from the list below once it appears.
+              </div>
+            </div>
+          ) : null}
 
           {attached.length === 0 ? (
             <div className="text-[12px] text-white/40">
-              No references attached. Attach from the list below.
+              No references attached. Attach from the list below or search the
+              corpus.
             </div>
           ) : (
             <ul className="space-y-1 mb-4">
@@ -346,14 +573,15 @@ export default function PostEditorPage() {
           ) : null}
 
           <div className="mt-3 text-[11px] text-white/40">
-            Add new references on the{" "}
+            Manage references on the{" "}
             <Link
               href="/hadith"
               className="underline underline-offset-2 hover:text-white/70"
             >
               Hadith verification page
             </Link>
-            .
+            . Every reference — including ones added from the local corpus —
+            starts UNVERIFIED.
           </div>
         </section>
 
@@ -408,5 +636,50 @@ export default function PostEditorPage() {
         </section>
       </div>
     </PageShell>
+  );
+}
+
+function ConvertPreviews({ content }: { content: string }) {
+  if (!content.trim()) {
+    return (
+      <div className="mt-3 text-[11px] text-white/40">
+        Type something in the draft above to preview it on other platforms.
+      </div>
+    );
+  }
+  const items: Array<{ label: string; text: string; limit: number }> = [
+    { label: "X", text: linkedinToX(content), limit: PLATFORMS.x.charLimit },
+    {
+      label: "Instagram",
+      text: linkedinToInstagram(content),
+      limit: PLATFORMS.instagram.charLimit,
+    },
+    {
+      label: "Facebook",
+      text: linkedinToFacebook(content),
+      limit: PLATFORMS.facebook.charLimit,
+    },
+  ];
+  return (
+    <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+      {items.map((it) => (
+        <div
+          key={it.label}
+          className="rounded-md border border-white/[0.06] bg-white/[0.02] p-2.5"
+        >
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-medium text-white/75">
+              {it.label}
+            </span>
+            <span className="text-[10px] text-white/40 tabular-nums">
+              {it.text.length} / {it.limit.toLocaleString()}
+            </span>
+          </div>
+          <div className="text-[11px] text-white/75 whitespace-pre-wrap leading-relaxed">
+            {it.text}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
