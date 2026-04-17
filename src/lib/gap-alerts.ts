@@ -48,17 +48,23 @@ export async function ensureCurrentWeek(): Promise<WeeklyCalendar> {
       onConflict: "week_start",
       ignoreDuplicates: true,
     });
-  const { data } = await db
+  const { data, error } = await db
     .from("content_calendar")
     .select("*")
     .eq("week_start", week)
     .single();
+  if (error || !data) {
+    throw new Error(
+      `Calendar week fetch failed after upsert: ${error?.message || "no row"}`
+    );
+  }
   return data as WeeklyCalendar;
 }
 
 export async function computeGapAlerts(): Promise<GapAlert[]> {
   const db = getSupabaseServer();
   const calendar = await ensureCurrentWeek();
+  if (!calendar) return [];
   const alerts: GapAlert[] = [];
 
   const since3d = new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString();
