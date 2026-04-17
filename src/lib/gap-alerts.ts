@@ -41,27 +41,19 @@ export function currentWeekStart(d: Date = new Date()): string {
 export async function ensureCurrentWeek(): Promise<WeeklyCalendar> {
   const db = getSupabaseServer();
   const week = currentWeekStart();
-  const { data: existing } = await db
+  // Upsert with ignoreDuplicates eliminates the check-then-insert race.
+  await db
+    .from("content_calendar")
+    .upsert({ week_start: week }, {
+      onConflict: "week_start",
+      ignoreDuplicates: true,
+    });
+  const { data } = await db
     .from("content_calendar")
     .select("*")
     .eq("week_start", week)
-    .maybeSingle();
-  if (existing) return existing as WeeklyCalendar;
-  const { data: inserted, error } = await db
-    .from("content_calendar")
-    .insert({ week_start: week })
-    .select()
     .single();
-  if (error) {
-    // Another request inserted concurrently; refetch.
-    const { data: row } = await db
-      .from("content_calendar")
-      .select("*")
-      .eq("week_start", week)
-      .maybeSingle();
-    return row as WeeklyCalendar;
-  }
-  return inserted as WeeklyCalendar;
+  return data as WeeklyCalendar;
 }
 
 export async function computeGapAlerts(): Promise<GapAlert[]> {
