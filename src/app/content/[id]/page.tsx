@@ -26,6 +26,7 @@ import { SlopChecker } from "@/components/SlopChecker";
 import { TypefullyPush } from "@/components/TypefullyPush";
 import { ImagePicker } from "@/components/ImagePicker";
 import { FigureAvailableRefs } from "@/components/FigureAvailableRefs";
+import { AmbientSuggestions } from "@/components/AmbientSuggestions";
 
 type PostStatus =
   | "idea"
@@ -477,6 +478,56 @@ export default function PostEditorPage() {
             </div>
           ) : null}
         </div>
+
+        <AmbientSuggestions
+          draft={draft}
+          figureName={figure?.name_en || null}
+          onPickHadith={async (row) => {
+            try {
+              const res = await fetch("/api/hadith", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  url: row.sunnah_com_url,
+                  reference_text: `${row.collection_name} ${row.hadith_number}`,
+                  narrator: row.narrator,
+                  arabic_text: row.arabic_text,
+                  translation_en: row.english_text,
+                }),
+              });
+              if (!res.ok) return;
+              const { hadith } = await res.json();
+              await fetch(`/api/posts/${postId}/hadith`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ hadith_id: hadith.id }),
+              });
+              loadPost();
+            } catch {
+              /* noop */
+            }
+          }}
+          onPickAyah={async (ayah) => {
+            try {
+              const current =
+                ((post as unknown as { quran_refs?: unknown[] })
+                  .quran_refs as unknown[]) || [];
+              const next = [
+                ...current,
+                {
+                  verse_key: ayah.verse_key,
+                  text_uthmani: ayah.text_uthmani,
+                  translation_en: ayah.translation_en,
+                },
+              ];
+              await save({
+                quran_refs: next,
+              } as unknown as Partial<Post>);
+            } catch {
+              /* noop */
+            }
+          }}
+        />
 
         {figure ? (
           <FigureAvailableRefs
