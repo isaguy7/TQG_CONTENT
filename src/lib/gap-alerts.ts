@@ -175,11 +175,16 @@ export async function recordPublished(postId: string): Promise<void> {
       figuresCovered = [...figuresCovered, figure.name_en];
       patch.figures_covered = figuresCovered;
     }
+    const { data: figureCounter } = await db
+      .from("islamic_figures")
+      .select("posts_written")
+      .eq("id", post.figure_id)
+      .maybeSingle();
     await db
       .from("islamic_figures")
       .update({
         last_posted_at: new Date().toISOString(),
-        posts_written: 1,
+        posts_written: (figureCounter?.posts_written ?? 0) + 1,
       })
       .eq("id", post.figure_id);
   }

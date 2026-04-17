@@ -118,13 +118,21 @@ export async function POST(req: NextRequest) {
     const first = drafts.find((d) => d.available && d.shareUrl);
     if (first) {
       const db = getSupabaseServer();
+      const { data: existing } = await db
+        .from("posts")
+        .select("performance")
+        .eq("id", body.post_id)
+        .maybeSingle();
+      const mergedPerf = {
+        ...((existing?.performance as Record<string, unknown>) || {}),
+        typefully_share_url: first.shareUrl,
+      };
       await db
         .from("posts")
         .update({
           status: "scheduled",
-          scheduled_for: null,
           updated_at: new Date().toISOString(),
-          performance: { typefully_share_url: first.shareUrl },
+          performance: mergedPerf,
         })
         .eq("id", body.post_id);
     }

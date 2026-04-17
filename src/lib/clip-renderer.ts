@@ -69,17 +69,18 @@ export async function renderClip(options: ClipRenderOptions): Promise<void> {
   filters.push(`[bg]subtitles='${subPathEsc}'[sub]`);
 
   let videoLabel = "[sub]";
+  // Background plays from its own t=0 (looping if shorter than clip duration);
+  // recitation is seeked to the selected segment. Mixing -ss on the
+  // background with -stream_loop produces undefined behaviour.
   const args: string[] = [
     "-y",
     "-hide_banner",
     "-loglevel",
     "error",
-    "-ss",
-    String(options.startTime),
-    "-t",
-    String(duration),
     "-stream_loop",
     "-1",
+    "-t",
+    String(duration),
     "-i",
     options.backgroundVideo,
     "-ss",
