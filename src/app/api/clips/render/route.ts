@@ -70,7 +70,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing clips" }, { status: 400 });
   }
   // Each clip must have either its own recitation or inherit the batch default.
-  for (const [i, c] of body.clips.entries()) {
+  for (let i = 0; i < body.clips.length; i++) {
+    const c = body.clips[i];
     if (!c.recitation_audio && !body.recitation_audio) {
       return NextResponse.json(
         { error: `Clip ${i + 1}: no recitation_audio (set per-clip or batch default)` },
