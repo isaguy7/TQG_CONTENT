@@ -7,6 +7,7 @@ import {
   CLIP_PLATFORMS,
   type ClipPlatformId,
 } from "@/lib/clip-platforms";
+import { StockBackgrounds } from "@/components/StockBackgrounds";
 
 type AssetFile = { name: string; path: string; size: number };
 type MatchResult = {
@@ -73,7 +74,7 @@ export default function NewClipBatchPage() {
   const [quranImported, setQuranImported] = useState(true);
   const [loadingSurah, setLoadingSurah] = useState<number | null>(null);
 
-  useEffect(() => {
+  const refreshAssets = () => {
     fetch("/api/clips/assets")
       .then((r) => r.json())
       .then((j) => {
@@ -81,10 +82,19 @@ export default function NewClipBatchPage() {
         setBackgrounds(j.backgrounds || []);
         setRecitationsDir(j.recitations_dir || "");
         setBackgroundsDir(j.backgrounds_dir || "");
-        if (j.recitations?.[0]) setDefaultRecitation(j.recitations[0].path);
-        if (j.backgrounds?.[0]) setDefaultBg(j.backgrounds[0].path);
+        if (!defaultRecitation && j.recitations?.[0]) {
+          setDefaultRecitation(j.recitations[0].path);
+        }
+        if (!defaultBg && j.backgrounds?.[0]) {
+          setDefaultBg(j.backgrounds[0].path);
+        }
       })
       .catch(() => {});
+  };
+
+  useEffect(() => {
+    refreshAssets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -448,6 +458,28 @@ export default function NewClipBatchPage() {
               ))}
             </ul>
           ) : null}
+        </section>
+
+        {/* Backgrounds — local + stock */}
+        <section className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="section-label">Backgrounds</span>
+            <span className="text-[11px] text-white/40 truncate max-w-[60%]">
+              {backgroundsDir}
+            </span>
+          </div>
+          <StockBackgrounds
+            orientation={
+              CLIP_PLATFORMS[defaultPlatform].height >
+              CLIP_PLATFORMS[defaultPlatform].width
+                ? "portrait"
+                : "square"
+            }
+            seedText={
+              clips.length > 0 ? clips[clips.length - 1].english : undefined
+            }
+            onDownloaded={() => refreshAssets()}
+          />
         </section>
 
         {/* Clip list */}

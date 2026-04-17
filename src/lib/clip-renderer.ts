@@ -48,8 +48,10 @@ export async function renderClip(options: ClipRenderOptions): Promise<void> {
   const outDir = path.dirname(options.outputPath);
   await mkdir(outDir, { recursive: true });
 
-  let subtitlePath = options.subtitleFile;
-  if (!subtitlePath) {
+  let subtitlePath: string;
+  if (options.subtitleFile) {
+    subtitlePath = options.subtitleFile;
+  } else {
     const ass = buildAssSubtitles(options.subtitles, {
       width,
       height,

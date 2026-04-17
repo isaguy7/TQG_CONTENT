@@ -36,6 +36,9 @@ export async function GET() {
     unsplash: {
       connected: unsplashConnected,
     },
+    pexels: {
+      connected: hasEnv("PEXELS_API_KEY"),
+    },
     linkedin: {
       connected: linkedinConnected,
       oauth_ready: false,
