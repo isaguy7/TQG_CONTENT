@@ -51,7 +51,28 @@
 
 @layer components {
   .section-label {
-    @apply text-[10px] uppercase tracking-[0.08em] text-white/30 font-medium;
+    @apply text-[11px] uppercase tracking-[0.08em] text-white/55 font-semibold;
+  }
+
+  .tqg-card {
+    @apply rounded-lg bg-white/[0.04] border border-white/[0.08] transition-colors;
+  }
+
+  .tqg-card-interactive {
+    @apply tqg-card hover:bg-white/[0.06] hover:border-white/[0.14];
+  }
+
+  .tqg-input {
+    @apply bg-white/[0.04] border border-white/[0.08] rounded-md px-3 py-2 text-[13px] text-white/90 placeholder-white/25 focus:outline-none focus:border-primary/50 transition-colors;
+  }
+}
+
+@layer base {
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  button:focus-visible {
+    outline: none;
   }
 }
 
