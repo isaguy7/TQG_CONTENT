@@ -5,6 +5,7 @@ import {
   PublishGateError,
   publishGateErrorBody,
 } from "@/lib/publish-gate";
+import { recordPublished } from "@/lib/gap-alerts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -125,6 +126,15 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  if (body.status === "published") {
+    try {
+      await recordPublished(params.id);
+    } catch {
+      // Non-critical; don't fail the PATCH.
+    }
+  }
+
   return NextResponse.json({ post: data });
 }
 
