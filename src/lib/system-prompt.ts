@@ -44,13 +44,19 @@ export type SystemPromptInput = {
   platform?: PlatformId | string | null;
 };
 
-const DEFAULT_INSTRUCTION = `Draft a LinkedIn post about {topic}.
+function defaultInstruction(platformLabel: string): string {
+  return `Draft a ${platformLabel} post about {topic}.
 Give me 10-15 hook options first, labelled by type
 (contrast, provocative, scene, purpose, refusal, dua, scale, loss,
 character). Then I'll pick one and we'll iterate on the draft.`;
+}
 
 export function buildSystemPrompt(input: SystemPromptInput): string {
   const parts: string[] = [WRITING_RULES];
+
+  const platformLabel = input.platform
+    ? getPlatform(input.platform).label
+    : "LinkedIn";
 
   if (input.platform) {
     const cfg = getPlatform(input.platform);
@@ -80,10 +86,9 @@ export function buildSystemPrompt(input: SystemPromptInput): string {
 
   const topicLabel =
     input.topic || input.figure?.nameEn || "the figure/topic above";
-  const instruction = (input.instruction || DEFAULT_INSTRUCTION).replace(
-    "{topic}",
-    topicLabel
-  );
+  const instruction = (
+    input.instruction || defaultInstruction(platformLabel)
+  ).replace("{topic}", topicLabel);
 
   parts.push(`\n=== INSTRUCTION ===\n${instruction}`);
 

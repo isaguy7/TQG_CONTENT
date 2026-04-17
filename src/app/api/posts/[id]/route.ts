@@ -6,6 +6,7 @@ import {
   publishGateErrorBody,
 } from "@/lib/publish-gate";
 import { recordPublished } from "@/lib/gap-alerts";
+import { isUuid } from "@/lib/utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +14,9 @@ export const dynamic = "force-dynamic";
 type Params = { params: { id: string } };
 
 export async function GET(_req: NextRequest, { params }: Params) {
+  if (!isUuid(params.id)) {
+    return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
+  }
   const db = getSupabaseServer();
   const { data: post, error } = await db
     .from("posts")
@@ -52,6 +56,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
  * hadith, instead of surfacing a raw DB trigger error later.
  */
 export async function PATCH(req: NextRequest, { params }: Params) {
+  if (!isUuid(params.id)) {
+    return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
+  }
   let body: {
     title?: string;
     final_content?: string | null;
@@ -139,6 +146,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
+  if (!isUuid(params.id)) {
+    return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
+  }
   const db = getSupabaseServer();
   const { error } = await db.from("posts").delete().eq("id", params.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

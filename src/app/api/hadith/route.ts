@@ -49,21 +49,35 @@ export async function POST(req: NextRequest) {
   }
 
   const rawUrl = body.url?.trim();
-  if (!rawUrl) {
-    return NextResponse.json({ error: "Missing 'url'" }, { status: 400 });
-  }
+  const trimmedRef = body.reference_text?.trim();
 
-  const canonical = canonicalizeSunnahUrl(rawUrl);
-  if (!canonical) {
+  // Allow corpus entries with a reference but no URL; otherwise require a URL.
+  if (!rawUrl && !trimmedRef) {
     return NextResponse.json(
-      { error: "URL must be on sunnah.com" },
+      { error: "Must provide 'url' or 'reference_text'" },
       { status: 400 }
     );
   }
 
-  const parsed = referenceFromUrl(canonical);
-  const reference =
-    body.reference_text?.trim() || parsed?.reference || canonical;
+  let canonical: string | null = null;
+  if (rawUrl) {
+    canonical = canonicalizeSunnahUrl(rawUrl);
+    if (!canonical) {
+      return NextResponse.json(
+        { error: "URL must be on sunnah.com" },
+        { status: 400 }
+      );
+    }
+  }
+
+  const parsed = canonical ? referenceFromUrl(canonical) : null;
+  const reference = trimmedRef || parsed?.reference || canonical;
+  if (!reference) {
+    return NextResponse.json(
+      { error: "Could not determine 'reference_text'" },
+      { status: 400 }
+    );
+  }
 
   const db = getSupabaseServer();
   const { data, error } = await db

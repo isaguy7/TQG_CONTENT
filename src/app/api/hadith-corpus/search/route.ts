@@ -23,10 +23,10 @@ export async function GET(req: NextRequest) {
 
   const db = getSupabaseServer();
 
-  const base = () => {
+  const base = (headOnly = false) => {
     let qb = db
       .from("hadith_corpus")
-      .select("*", { count: "exact" })
+      .select("*", { count: "exact", head: headOnly })
       .order("collection", { ascending: true })
       .order("hadith_number", { ascending: true });
     if (collection) qb = qb.eq("collection", collection);
@@ -34,20 +34,35 @@ export async function GET(req: NextRequest) {
   };
 
   if (!q) {
-    let qb = base();
-    if (limit > 0) qb = qb.limit(limit);
-    else qb = qb.limit(1); // avoid fetching rows when only count is needed
-    const { data, count, error } = await qb;
+    if (limit === 0) {
+      const { count, error } = await base(true);
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      return NextResponse.json({ results: [], total: count ?? 0 });
+    }
+    const { data, count, error } = await base().limit(limit);
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
     return NextResponse.json({
-      results: limit > 0 ? data || [] : [],
+      results: data || [],
       total: count ?? 0,
     });
   }
 
-  const safeLimit = limit > 0 ? limit : 20;
+  if (limit === 0) {
+    const { count, error } = await base(true).textSearch("english_text", q, {
+      type: "websearch",
+      config: "english",
+    });
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ results: [], total: count ?? 0 });
+  }
+
+  const safeLimit = limit;
 
   const ftsRes = await base()
     .textSearch("english_text", q, { type: "websearch", config: "english" })
