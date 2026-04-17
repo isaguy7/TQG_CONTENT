@@ -14,7 +14,14 @@ export async function GET() {
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const batches = (data || []).map((b: { id: string; name: string; clip_ids: string[] | null; status: string; created_at: string }) => ({
+  type BatchRow = {
+    id: string;
+    name: string;
+    clip_ids: string[] | null;
+    status: string;
+    created_at: string;
+  };
+  const batches = ((data || []) as BatchRow[]).map((b) => ({
     id: b.id,
     name: b.name,
     status: b.status,
@@ -22,7 +29,7 @@ export async function GET() {
     clip_count: Array.isArray(b.clip_ids) ? b.clip_ids.length : 0,
   }));
 
-  const totalClips = batches.reduce((n, b) => n + b.clip_count, 0);
+  const totalClips = batches.reduce((n: number, b) => n + b.clip_count, 0);
   const lastBatchAt = batches[0]?.created_at || null;
 
   return NextResponse.json({

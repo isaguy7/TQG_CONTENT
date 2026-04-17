@@ -42,23 +42,6 @@ export default function HadithPage() {
     })();
   }, [refresh]);
 
-  const handleToggleVerified = useCallback(
-    async (h: HadithRecord) => {
-      try {
-        const res = await fetch(`/api/hadith/${h.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ verified: !h.verified }),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        await refresh();
-      } catch (err) {
-        setError((err as Error).message);
-      }
-    },
-    [refresh]
-  );
-
   const handleDelete = useCallback(
     async (h: HadithRecord) => {
       if (!confirm(`Delete "${h.reference_text}"? This removes the row entirely.`))
@@ -90,29 +73,18 @@ export default function HadithPage() {
     [refresh]
   );
 
-  const verifiedCount = hadith.filter((h) => h.verified).length;
-
   return (
     <PageShell
-      title="Hadith verification"
-      description="Every reference must link to sunnah.com and be manually verified"
+      title="Hadith references"
+      description="Browse the local corpus and manage the references attached to your posts"
     >
       <div className="max-w-4xl space-y-6">
-        <div className="grid grid-cols-4 gap-3">
-          <StatTile label="Total" value={String(hadith.length)} />
-          <StatTile
-            label="Verified"
-            value={String(verifiedCount)}
-            tone="success"
-          />
-          <StatTile
-            label="Unverified"
-            value={String(hadith.length - verifiedCount)}
-            tone={hadith.length - verifiedCount > 0 ? "danger" : "muted"}
-          />
+        <div className="grid grid-cols-2 gap-3">
+          <StatTile label="Your references" value={String(hadith.length)} />
           <StatTile
             label="Corpus"
             value={corpusCount === null ? "—" : corpusCount.toLocaleString()}
+            hint="Bukhari, Muslim, Abu Dawud, Tirmidhi, Nasa'i, Ibn Majah"
           />
         </div>
 
@@ -134,21 +106,19 @@ export default function HadithPage() {
           ) : (
             <HadithList
               hadith={hadith}
-              onToggleVerified={handleToggleVerified}
               onDelete={handleDelete}
               onSaveNotes={handleSaveNotes}
             />
           )}
         </section>
 
-        <section className="rounded-lg bg-white/[0.02] border border-white/[0.06] p-4 text-[12px] text-white/50 leading-relaxed">
-          <div className="section-label mb-2">Why this exists</div>
+        <section className="rounded-lg bg-white/[0.02] border border-white/[0.06] p-4 text-[12px] text-white/55 leading-relaxed">
+          <div className="section-label mb-2">How hadith work in TQG Studio</div>
           <p>
-            The app NEVER generates hadith reference numbers from AI. Every
-            reference you attach to a post must link to sunnah.com and pass
-            through this table. Posts stay in review until every attached
-            reference is manually verified. The DB trigger enforces this at
-            the row level — it cannot be bypassed even via direct API call.
+            Every reference links to sunnah.com so readers can follow the chain
+            back to the original collection. The app never fabricates hadith
+            numbers or translations — it only references what already exists in
+            the corpus.
           </p>
         </section>
       </div>
@@ -159,24 +129,21 @@ export default function HadithPage() {
 function StatTile({
   label,
   value,
-  tone = "muted",
+  hint,
 }: {
   label: string;
   value: string;
-  tone?: "muted" | "success" | "danger";
+  hint?: string;
 }) {
-  const toneClass =
-    tone === "success"
-      ? "text-emerald-400"
-      : tone === "danger"
-        ? "text-danger"
-        : "text-white/85";
   return (
-    <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
+    <div className="rounded-lg bg-white/[0.04] border border-white/[0.08] p-4">
       <div className="section-label">{label}</div>
-      <div className={`mt-2 text-2xl font-semibold tabular-nums ${toneClass}`}>
+      <div className="mt-2 text-2xl font-semibold tabular-nums text-white/90">
         {value}
       </div>
+      {hint ? (
+        <div className="mt-1 text-[11px] text-white/40">{hint}</div>
+      ) : null}
     </div>
   );
 }

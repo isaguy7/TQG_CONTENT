@@ -29,9 +29,9 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * POST /api/hadith — create a new hadith verification from a sunnah.com URL.
- * Starts as verified=false. Use PATCH /api/hadith/[id] to mark verified
- * after manual review.
+ * POST /api/hadith — create a new hadith reference from a sunnah.com URL.
+ * V2: auto-marks verified=true because every corpus entry ships with a
+ * canonical sunnah.com URL readers can follow for themselves.
  */
 export async function POST(req: NextRequest) {
   let body: {
@@ -75,7 +75,8 @@ export async function POST(req: NextRequest) {
       arabic_text: body.arabic_text || null,
       translation_en: body.translation_en || null,
       grade: body.grade || null,
-      verified: false,
+      verified: true,
+      verified_at: new Date().toISOString(),
     })
     .select()
     .single();

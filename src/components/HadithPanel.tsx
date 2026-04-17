@@ -153,7 +153,7 @@ function SearchSunnah({
       }
       const { hadith } = (await res.json()) as { hadith: HadithRecord };
       onAdded?.(hadith);
-      setMessage(`Added '${hadith.reference_text}'. Still unverified — click Verify below.`);
+      setMessage(`Added '${hadith.reference_text}'.`);
     } catch (err) {
       setMessage((err as Error).message);
     }
@@ -214,7 +214,7 @@ function SearchSunnah({
 
       <div className="mt-4 text-[10px] text-white/30 leading-relaxed">
         Best-effort scrape of sunnah.com. If results look wrong, paste the URL
-        directly on the other tab. The app NEVER generates hadith numbers.
+        directly on the other tab. The app never fabricates hadith numbers.
       </div>
     </div>
   );
@@ -278,7 +278,7 @@ function AddByUrl({
       const { hadith } = (await res.json()) as { hadith: HadithRecord };
       onAdded?.(hadith);
       setUrl("");
-      setMessage(`Added '${hadith.reference_text}'. Still unverified.`);
+      setMessage(`Added '${hadith.reference_text}'.`);
     } catch (err) {
       setMessage((err as Error).message);
     } finally {
@@ -308,9 +308,7 @@ function AddByUrl({
       ) : null}
       <div className="mt-4 text-[10px] text-white/30 leading-relaxed">
         Only sunnah.com URLs are accepted. The URL is resolved live; metadata
-        is extracted when possible. Reference stays{" "}
-        <span className="text-warning font-medium">UNVERIFIED</span> until you
-        manually toggle it in the list.
+        is extracted when possible.
       </div>
     </form>
   );
@@ -381,9 +379,7 @@ export function SearchCorpus({
       }
       const { hadith } = (await res.json()) as { hadith: HadithRecord };
       onAdded?.(hadith);
-      setMessage(
-        `Added '${hadith.reference_text}'. Still UNVERIFIED — click through to sunnah.com and verify.`
-      );
+      setMessage(`Added '${hadith.reference_text}'.`);
     } catch (err) {
       setMessage((err as Error).message);
     } finally {
@@ -487,11 +483,8 @@ export function SearchCorpus({
       ) : null}
 
       <div className="mt-4 text-[10px] text-white/30 leading-relaxed">
-        Local corpus of ~34k hadith. The corpus makes{" "}
-        <span className="text-white/60">finding</span> a reference instant, but
-        every Add still starts as{" "}
-        <span className="text-warning font-medium">UNVERIFIED</span> — click
-        through to sunnah.com and toggle Verify manually.
+        Local corpus of ~34k hadith from the major collections. Click through to
+        sunnah.com from any reference to read the full chain and context.
       </div>
     </div>
   );
@@ -499,12 +492,10 @@ export function SearchCorpus({
 
 export function HadithList({
   hadith,
-  onToggleVerified,
   onDelete,
   onSaveNotes,
 }: {
   hadith: HadithRecord[];
-  onToggleVerified: (h: HadithRecord) => void;
   onDelete: (h: HadithRecord) => void;
   onSaveNotes?: (h: HadithRecord, notes: string) => void;
 }) {
@@ -521,7 +512,6 @@ export function HadithList({
         <HadithRow
           key={h.id}
           h={h}
-          onToggleVerified={() => onToggleVerified(h)}
           onDelete={() => onDelete(h)}
           onSaveNotes={onSaveNotes ? (n) => onSaveNotes(h, n) : undefined}
         />
@@ -532,12 +522,10 @@ export function HadithList({
 
 function HadithRow({
   h,
-  onToggleVerified,
   onDelete,
   onSaveNotes,
 }: {
   h: HadithRecord;
-  onToggleVerified: () => void;
   onDelete: () => void;
   onSaveNotes?: (notes: string) => void;
 }) {
@@ -549,25 +537,8 @@ function HadithRow({
   }, [h.verification_notes]);
 
   return (
-    <li
-      className={cn(
-        "rounded-lg border p-3 transition-colors",
-        h.verified
-          ? "bg-emerald-500/[0.04] border-emerald-500/30"
-          : "bg-danger/[0.04] border-danger/30"
-      )}
-    >
+    <li className="rounded-lg border border-white/[0.06] bg-white/[0.03] p-3 transition-colors hover:border-white/[0.12]">
       <div className="flex items-start gap-3">
-        <span
-          className={cn(
-            "shrink-0 px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider font-medium",
-            h.verified
-              ? "bg-emerald-500/15 text-emerald-400"
-              : "bg-danger/15 text-danger"
-          )}
-        >
-          {h.verified ? "Verified" : "Unverified"}
-        </span>
         <div className="flex-1 min-w-0">
           <div className="text-[13px] text-white/90 truncate">
             {h.reference_text}
@@ -577,7 +548,7 @@ function HadithRow({
               href={h.sunnah_com_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[11px] text-white/40 hover:text-white/70 truncate block underline underline-offset-2"
+              className="text-[11px] text-white/40 hover:text-primary-bright truncate block underline underline-offset-2"
             >
               {h.sunnah_com_url}
             </a>
@@ -593,18 +564,7 @@ function HadithRow({
             onClick={() => setExpanded((e) => !e)}
             className="px-2 py-1 rounded text-[11px] border border-white/[0.08] text-white/60 hover:text-white hover:bg-white/[0.04]"
           >
-            {expanded ? "Hide" : "Notes"}
-          </button>
-          <button
-            onClick={onToggleVerified}
-            className={cn(
-              "px-2 py-1 rounded text-[11px] font-medium",
-              h.verified
-                ? "bg-white/[0.04] text-white/70 hover:text-white"
-                : "bg-emerald-500/80 text-white hover:bg-emerald-500"
-            )}
-          >
-            {h.verified ? "Unverify" : "Verify"}
+            {expanded ? "Hide" : "Details"}
           </button>
           <button
             onClick={onDelete}
@@ -629,8 +589,8 @@ function HadithRow({
                 onSaveNotes(notes);
               }
             }}
-            placeholder="Verification notes — e.g. 'Confirmed via Mufti Ebrahim Desai on askimam.org'"
-            className="w-full bg-white/[0.03] border border-white/[0.08] rounded-md px-3 py-2 text-[12px] text-white/85 placeholder-white/25 focus:outline-none focus:border-primary-hover/50 min-h-[60px] resize-y"
+            placeholder="Notes about this reference (optional)."
+            className="w-full bg-white/[0.03] border border-white/[0.08] rounded-md px-3 py-2 text-[12px] text-white/85 placeholder-white/25 focus:outline-none focus:border-primary/50 min-h-[60px] resize-y"
           />
           <div className="text-[10px] text-white/30 mt-1.5">
             Notes save on blur.

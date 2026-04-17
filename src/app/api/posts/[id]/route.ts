@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase";
-import {
-  assertPublishable,
-  PublishGateError,
-  publishGateErrorBody,
-} from "@/lib/publish-gate";
 import { recordPublished } from "@/lib/gap-alerts";
 
 export const runtime = "nodejs";
@@ -70,17 +65,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  if (body.status === "ready") {
-    try {
-      await assertPublishable(params.id);
-    } catch (err) {
-      if (err instanceof PublishGateError) {
-        return NextResponse.json(publishGateErrorBody(err), { status: 422 });
-      }
-      throw err;
-    }
-  }
-
   const update: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
   };
@@ -112,18 +96,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     .single();
 
   if (error) {
-    // DB trigger backstop — if the Node gate missed a case, the trigger
-    // still rejects. Surface it cleanly.
-    if (/unverified hadith/i.test(error.message)) {
-      return NextResponse.json(
-        {
-          error: "publish_gate",
-          message: error.message,
-          unverified: [],
-        },
-        { status: 422 }
-      );
-    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
