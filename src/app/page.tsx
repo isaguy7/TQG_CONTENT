@@ -7,6 +7,7 @@ import {
   FigureRecommendation,
 } from "@/components/DashboardLive";
 import { IntegrationsBar } from "@/components/IntegrationsBar";
+import { ClaudeStatusCard } from "@/components/ClaudeStatusCard";
 import { ProviderTokenCapture } from "@/components/ProviderTokenCapture";
 import { TypefullyAutoSync } from "@/components/TypefullyAutoSync";
 import Link from "next/link";
@@ -152,6 +153,7 @@ export default async function DashboardPage() {
             <HookPerformance tier1Avg={4117} tier2Avg={475} />
           ) : null}
           <FigureRecommendation />
+          <ClaudeStatusCard />
           <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
             <div className="section-label mb-3">Quick create</div>
             <div className="space-y-1.5">
