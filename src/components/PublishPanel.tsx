@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
-import { TypefullyPush } from "@/components/TypefullyPush";
 
 type Platform = "linkedin" | "x";
 
@@ -298,19 +297,32 @@ export function PublishPanel({
                   </div>
                 </div>
                 {conn && !expired ? (
-                  <label className="flex items-center gap-2 text-[11px] text-white/60">
-                    <input
-                      type="checkbox"
-                      checked={isOn}
-                      onChange={(e) =>
-                        setEnabled((prev) => ({
-                          ...prev,
-                          [p]: e.target.checked,
-                        }))
-                      }
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEnabled((prev) => ({
+                        ...prev,
+                        [p]: !prev[p],
+                      }))
+                    }
+                    aria-pressed={isOn}
+                    className={cn(
+                      "relative inline-flex h-6 w-12 items-center rounded-full transition-all duration-200 focus:outline-none ring-1 ring-inset",
+                      isOn
+                        ? "bg-gradient-to-r from-emerald-500 to-cyan-500 ring-emerald-300/60"
+                        : "bg-white/10 ring-white/10 hover:bg-white/15"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-all duration-200",
+                        isOn ? "translate-x-6" : "translate-x-1"
+                      )}
                     />
-                    Enable
-                  </label>
+                    <span className="sr-only">
+                      {isOn ? "Disable" : "Enable"} {PLATFORM_LABEL[p]}
+                    </span>
+                  </button>
                 ) : (
                   <a
                     href="/login"
@@ -319,6 +331,11 @@ export function PublishPanel({
                     {expired ? "Reconnect" : `Connect ${PLATFORM_LABEL[p]}`}
                   </a>
                 )}
+                {conn && !expired ? (
+                  <span className="text-[11px] text-white/45 w-10 text-right">
+                    {isOn ? "On" : "Off"}
+                  </span>
+                ) : null}
               </div>
 
               {isOn && conn && !expired && p === "linkedin" && linkedinAuthors.length > 1 ? (
@@ -470,22 +487,6 @@ export function PublishPanel({
         </ul>
       ) : null}
 
-      {/* Fallback: if Typefully is configured server-side, keep it as a
-          secondary option for any platform that isn't connected directly. */}
-      <details className="pt-2 border-t border-white/[0.05]">
-        <summary className="text-[11px] text-white/40 cursor-pointer hover:text-white/70">
-          Advanced — push via Typefully (fallback)
-        </summary>
-        <div className="mt-2">
-          <TypefullyPush
-            postId={postId}
-            content={content}
-            platform={platform}
-            imageUrl={imageUrl}
-            onScheduled={onPublished}
-          />
-        </div>
-      </details>
     </section>
   );
 }

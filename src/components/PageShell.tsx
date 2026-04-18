@@ -16,18 +16,18 @@ export function PageShell({
   return (
     <div className="flex h-full">
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="h-12 border-b border-white/[0.06] flex items-center justify-between px-6 shrink-0">
+        <header className="h-14 border-b border-white/[0.08] bg-white/[0.04] backdrop-blur-md flex items-center justify-between px-6 shrink-0 shadow-[0_10px_40px_rgba(0,0,0,0.35)]">
           <div>
             <h1 className="text-[13px] font-semibold text-white/90 leading-none">
               {title}
             </h1>
             {description ? (
-              <p className="text-[11px] text-white/40 mt-1 leading-none">
+              <p className="text-[11px] text-white/45 mt-1 leading-none">
                 {description}
               </p>
             ) : null}
           </div>
-          {actions ? <div className="flex gap-2">{actions}</div> : null}
+          {actions ? <div className="flex gap-2 items-center">{actions}</div> : null}
         </header>
         <div className="flex-1 overflow-y-auto p-6">{children}</div>
       </div>

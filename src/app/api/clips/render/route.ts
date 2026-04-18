@@ -3,7 +3,8 @@ import path from "node:path";
 import { stat, mkdir } from "node:fs/promises";
 import { getSupabaseServer } from "@/lib/supabase";
 import { getClipPlatform, type ClipPlatformId } from "@/lib/clip-platforms";
-import { ffmpegAvailable } from "@/lib/environment";
+import { ffmpegAvailable, isHosted } from "@/lib/environment";
+import { requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,17 +49,8 @@ async function exists(p: string): Promise<boolean> {
 }
 
 export async function POST(req: NextRequest) {
-  if (!ffmpegAvailable()) {
-    return NextResponse.json(
-      {
-        error:
-          "Clip rendering requires the local desktop app with GPU access.",
-      },
-      { status: 501 }
-    );
-  }
-  // Dynamic import keeps ffmpeg/spawn out of the Edge bundle on Vercel.
-  const { renderClip } = await import("@/lib/clip-renderer");
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
 
   let body: RenderRequest;
   try {
@@ -80,18 +72,41 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const rendersDir = path.resolve(process.cwd(), RENDERS_DIR);
-  await mkdir(rendersDir, { recursive: true });
-
   const db = getSupabaseServer();
+  const hosted = isHosted();
+  if (!hosted && !ffmpegAvailable()) {
+    return NextResponse.json(
+      {
+        error:
+          "Clip rendering requires the local desktop app with GPU access.",
+      },
+      { status: 501 }
+    );
+  }
+
   const { data: batch } = await db
     .from("clip_batch")
     .insert({
       name: body.batch_name || `batch-${new Date().toISOString().slice(0, 16)}`,
-      status: "rendering",
+      status: hosted ? "queued" : "rendering",
+      payload: body,
+      user_id: auth.user.id,
     })
     .select()
     .single();
+
+  if (hosted) {
+    return NextResponse.json({
+      queued: true,
+      batch_id: batch?.id || null,
+      status: "queued",
+    });
+  }
+
+  // Dynamic import keeps ffmpeg/spawn out of the Edge bundle on Vercel.
+  const { renderClip } = await import("@/lib/clip-renderer");
+  const rendersDir = path.resolve(process.cwd(), RENDERS_DIR);
+  await mkdir(rendersDir, { recursive: true });
 
   const results: Array<{
     output: string;
@@ -139,12 +154,18 @@ export async function POST(req: NextRequest) {
   if (batch?.id) {
     await db
       .from("clip_batch")
-      .update({ status: allOk ? "done" : "error" })
+      .update({
+        status: allOk ? "completed" : "error",
+        results,
+        processed_at: new Date().toISOString(),
+        error: allOk ? null : results.find((r) => !r.ok)?.error || null,
+      })
       .eq("id", batch.id);
   }
 
   return NextResponse.json({
     batch_id: batch?.id || null,
+    status: allOk ? "completed" : "error",
     results,
   });
 }

@@ -17,14 +17,13 @@ import {
 } from "@/lib/platform-rules";
 import { buildSystemPrompt, type FigureContext } from "@/lib/system-prompt";
 import { ConvertPreviews } from "@/components/ConvertPreviews";
-import { HookGenerator } from "@/components/HookGenerator";
-import { SlopChecker } from "@/components/SlopChecker";
 import { PublishPanel } from "@/components/PublishPanel";
 import { ImagePicker } from "@/components/ImagePicker";
 import { FigureContextPanel } from "@/components/FigureContextPanel";
 import { FigurePicker } from "@/components/FigurePicker";
 import { AmbientSuggestions } from "@/components/AmbientSuggestions";
 import { PostLabels } from "@/components/PostLabels";
+import { AiAssistantDrawer } from "@/components/AiAssistantDrawer";
 
 type PostStatus =
   | "idea"
@@ -197,6 +196,23 @@ export default function PostEditorPage() {
     }
   };
 
+  const appendFromAssistant = (text: string) => {
+    setDraft((prev) => {
+      const next = prev ? `${prev}\n\n${text}` : text;
+      save({ final_content: next });
+      return next;
+    });
+  };
+
+  const handleImageChange = (image_url: string | null, image_rationale: string | null) => {
+    if (!post) return;
+    save({ image_url, image_rationale });
+    setPost({ ...post, image_url, image_rationale });
+  };
+
+  const moveToDrafts = () => save({ status: "drafting" as PostStatus });
+  const moveToIdeas = () => save({ status: "idea" as PostStatus });
+
   const attachedIds = useMemo(() => new Set(attached.map((h) => h.id)), [attached]);
   const availableHadith = useMemo(
     () => allHadith.filter((h) => !attachedIds.has(h.id)),
@@ -254,6 +270,7 @@ export default function PostEditorPage() {
         : tone === "optimal"
           ? "bg-emerald-400"
           : "bg-white/40";
+  const isIdea = post.status === "idea";
 
   return (
     <PageShell
@@ -271,6 +288,36 @@ export default function PostEditorPage() {
               {copyMsg}
             </span>
           ) : null}
+          <AiAssistantDrawer
+            postId={post.id}
+            draft={draft}
+            figureName={figure?.name_en || null}
+            hadithCount={attached.length}
+            onInsert={appendFromAssistant}
+            onSelectImage={handleImageChange}
+          />
+          {isIdea ? (
+            <button
+              onClick={moveToDrafts}
+              className="px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-gradient-to-r from-emerald-500/80 to-cyan-500/80 text-black shadow-lg shadow-emerald-500/20 hover:from-emerald-400/80 hover:to-cyan-400/80 transition-all duration-200"
+            >
+              Move to drafts
+            </button>
+          ) : (
+            <details className="relative">
+              <summary className="px-3 py-1.5 rounded-lg text-[12px] border border-white/[0.1] text-white/75 hover:bg-white/[0.05] cursor-pointer">
+                Status menu
+              </summary>
+              <div className="absolute right-0 mt-2 w-44 rounded-xl border border-white/[0.08] bg-white/[0.08] backdrop-blur-md shadow-lg shadow-black/30 p-2 z-10">
+                <button
+                  onClick={moveToIdeas}
+                  className="w-full text-left px-2 py-1.5 rounded-md text-[12px] text-white/85 hover:bg-white/[0.12] transition-colors"
+                >
+                  Move back to ideas
+                </button>
+              </div>
+            </details>
+          )}
           <button
             onClick={copyForClaude}
             className="px-3 py-1.5 rounded text-[12px] border border-white/[0.08] text-white/85 hover:text-white hover:bg-white/[0.04]"
@@ -325,21 +372,6 @@ export default function PostEditorPage() {
             />
           </div>
         </div>
-
-        {/* Hooks live ABOVE the editor so they feel like the starting
-            move for a draft, not an afterthought. HookGenerator auto-hides
-            itself when the Claude API isn't configured. */}
-        <HookGenerator
-          postId={post.id}
-          onPick={(h) => {
-            save({ hook_selected: h.text });
-            if (!draft.trim()) {
-              setDraft(h.text + "\n\n");
-            } else {
-              setDraft(h.text + "\n\n" + draft);
-            }
-          }}
-        />
 
         <div
           className="rounded-xl border border-white/[0.06] p-6 shadow-lg shadow-black/10"
@@ -533,8 +565,6 @@ export default function PostEditorPage() {
           />
         ) : null}
 
-        <SlopChecker content={draft} postId={post.id} />
-
         <PublishPanel
           postId={post.id}
           content={draft}
@@ -637,13 +667,9 @@ export default function PostEditorPage() {
         <ImagePicker
           imageUrl={post.image_url}
           imageRationale={post.image_rationale}
-          onChange={(image_url, image_rationale) => {
-            save({ image_url, image_rationale });
-            setPost({ ...post, image_url, image_rationale });
-          }}
+          onChange={handleImageChange}
         />
       </div>
     </PageShell>
   );
 }
-

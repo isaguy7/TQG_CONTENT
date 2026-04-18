@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PageShell } from "@/components/PageShell";
 import { GapAlert } from "@/components/GapAlert";
 import { cn } from "@/lib/utils";
+import { CalendarClock } from "lucide-react";
 
 type LocalPost = {
   id: string;
@@ -124,6 +125,8 @@ export default function CalendarPage() {
     while (cells.length % 7 !== 0) cells.push({ date: null, items: [] });
     return cells;
   }, [data]);
+  const nothingScheduled =
+    data && data.posts.length === 0 && data.typefully_drafts.length === 0;
 
   const movePost = useCallback(
     async (postId: string, dateStr: string) => {
@@ -227,7 +230,15 @@ export default function CalendarPage() {
       }
     >
       {!data ? (
-        <div className="text-[13px] text-white/40">Loading calendar…</div>
+        <div className="max-w-xl mx-auto rounded-2xl border border-white/[0.08] bg-white/[0.06] backdrop-blur-md p-5 text-center">
+          <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-200 border border-emerald-400/40 mb-2">
+            <CalendarClock className="w-5 h-5" />
+          </div>
+          <div className="text-[13px] text-white/80">Loading calendar…</div>
+          <div className="text-[12px] text-white/50">
+            We’ll pull scheduled posts and Typefully history in the background.
+          </div>
+        </div>
       ) : (
         <div className="space-y-4">
           <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -257,6 +268,20 @@ export default function CalendarPage() {
           {moveError ? (
             <div className="rounded-lg bg-danger/[0.08] border border-danger/30 p-3 text-[12px] text-danger">
               Move failed: {moveError}
+            </div>
+          ) : null}
+
+          {nothingScheduled ? (
+            <div className="rounded-2xl border border-white/[0.1] bg-white/[0.06] backdrop-blur-md p-5 text-center shadow-lg shadow-black/20">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-200 border border-emerald-400/40 mb-2">
+                <CalendarClock className="w-5 h-5" />
+              </div>
+              <div className="text-[13px] text-white/85">
+                Your calendar is clear.
+              </div>
+              <div className="text-[12px] text-white/55">
+                Capture an idea or schedule a post to fill the grid.
+              </div>
             </div>
           ) : null}
 

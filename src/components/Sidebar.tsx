@@ -3,6 +3,19 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import {
+  BookOpen,
+  CalendarClock,
+  Clapperboard,
+  Clock3,
+  FileText,
+  LayoutDashboard,
+  Lightbulb,
+  PlayCircle,
+  Settings,
+  Sparkles,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TypefullyAutoSync } from "@/components/TypefullyAutoSync";
 
@@ -14,14 +27,15 @@ type Me = {
   provider: string | null;
 };
 
-const nav = [
-  { href: "/", label: "Dashboard" },
-  { href: "/content", label: "Content" },
-  { href: "/figures", label: "Figures" },
-  { href: "/clips", label: "Clips" },
-  { href: "/hadith", label: "References" },
-  { href: "/calendar", label: "Calendar" },
-  { href: "/settings", label: "Settings" },
+const nav: Array<{ href: string; label: string; icon: LucideIcon }> = [
+  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/content", label: "Content", icon: FileText },
+  { href: "/figures", label: "Figures", icon: BookOpen },
+  { href: "/clips", label: "Clips", icon: Clapperboard },
+  { href: "/queue", label: "Render queue", icon: PlayCircle },
+  { href: "/hadith", label: "References", icon: Sparkles },
+  { href: "/calendar", label: "Calendar", icon: CalendarClock },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 type PostStatus =
@@ -66,6 +80,12 @@ export function Sidebar() {
   const [recent, setRecent] = useState<RecentPost[] | null>(null);
   const [me, setMe] = useState<Me | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+  const [ideaOpen, setIdeaOpen] = useState(false);
+  const [ideaText, setIdeaText] = useState("");
+  const [ideaSaving, setIdeaSaving] = useState(false);
+  const [ideaMsg, setIdeaMsg] = useState<string | null>(null);
+  const [ideaCreatedId, setIdeaCreatedId] = useState<string | null>(null);
+  const [recentOpen, setRecentOpen] = useState(false);
 
   const load = () => {
     fetch("/api/posts?limit=5")
@@ -97,157 +117,261 @@ export function Sidebar() {
     router.refresh();
   };
 
+  const captureIdea = async () => {
+    const note = ideaText.trim();
+    if (!note) {
+      setIdeaMsg("Add a quick note first.");
+      return;
+    }
+    setIdeaSaving(true);
+    setIdeaMsg(null);
+    setIdeaCreatedId(null);
+    try {
+      const title = note.split(/\n/, 1)[0].slice(0, 120) || "New idea";
+      const res = await fetch("/api/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, final_content: note }),
+      });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const j = (await res.json()) as { post?: { id?: string } };
+      setIdeaMsg("Captured in Ideas");
+      setIdeaCreatedId(j.post?.id || null);
+      setIdeaText("");
+      load();
+    } catch (err) {
+      setIdeaMsg((err as Error).message);
+    } finally {
+      setIdeaSaving(false);
+    }
+  };
+
   return (
-    <aside className="w-48 shrink-0 bg-sidebar border-r border-white/[0.06] flex flex-col">
-      <TypefullyAutoSync onDone={load} />
-      <div className="h-12 flex items-center px-4 border-b border-white/[0.06]">
-        <span className="text-[13px] font-semibold tracking-tight text-white/90">
-          TQG Studio
-        </span>
-      </div>
+    <>
+      <aside className="relative w-16 shrink-0 bg-sidebar/90 border-r border-white/[0.06] flex flex-col items-center py-4 gap-3 backdrop-blur-md">
+        <TypefullyAutoSync onDone={load} />
+        <div className="w-10 h-10 rounded-xl bg-white/[0.08] border border-white/[0.08] flex items-center justify-center text-[11px] font-semibold text-white/90 shadow-lg shadow-black/30">
+          TQG
+        </div>
 
-      <nav className="pt-3 pb-4 px-2">
-        {nav.map(({ href, label }) => {
-          const active =
-            href === "/" ? pathname === "/" : pathname?.startsWith(href);
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                "relative block pl-4 pr-3 py-2 text-[13px] rounded transition-colors",
-                active
-                  ? "bg-primary/[0.08] text-white/95"
-                  : "text-white/55 hover:text-white/90 hover:bg-white/[0.025]"
-              )}
-            >
-              {/* 2px accent-green left bar marks the current route. Kept
-                  absolute so the text baselines line up between active /
-                  inactive items. */}
-              {active ? (
-                <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-primary-bright" />
-              ) : null}
-              {label}
-            </Link>
-          );
-        })}
-      </nav>
-
-      <div className="px-4 pt-2 pb-1.5 flex items-center justify-between">
-        <span className="section-label">Recent</span>
-        <Link
-          href="/content"
-          className="text-[10px] text-white/35 hover:text-white/70"
-        >
-          all
-        </Link>
-      </div>
-      <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-0.5">
-        {recent === null ? (
-          <div className="px-3 py-2 text-[11px] text-white/35">Loading…</div>
-        ) : recent.length === 0 ? (
-          <div className="px-3 py-2 text-[11px] text-white/35">
-            No drafts yet.
-          </div>
-        ) : (
-          recent.map((d) => {
-            const isTypefully = Boolean(
-              d.performance &&
-                ((d.performance as Record<string, unknown>)
-                  .imported_from_typefully ||
-                  Array.isArray(
-                    (d.performance as Record<string, unknown>)
-                      .typefully_draft_ids
-                  ))
-            );
+        <nav className="flex-1 flex flex-col gap-2 mt-3">
+          {nav.map(({ href, label, icon: Icon }) => {
+            const active =
+              href === "/" ? pathname === "/" : pathname?.startsWith(href);
             return (
-            <Link
-              key={d.id}
-              href={`/content/${d.id}`}
-              className="block pl-3 pr-2 py-1.5 rounded hover:bg-white/[0.03] transition-colors"
-              title={statusLabel[d.status]}
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <span
-                  className={cn(
-                    "shrink-0 w-1.5 h-1.5 rounded-full",
-                    statusDot[d.status]
-                  )}
-                />
-                <span className="text-[12px] text-white/80 truncate leading-tight">
-                  {d.title || "Untitled"}
-                </span>
-                {isTypefully ? (
-                  <span
-                    className="shrink-0 text-[8px] text-white/35 uppercase tracking-wider border border-white/[0.08] rounded px-1"
-                    title="Typefully"
-                  >
-                    TF
-                  </span>
+              <Link
+                key={href}
+                href={href}
+                className={cn(
+                  "group relative flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200",
+                  active
+                    ? "bg-emerald-500/15 text-emerald-50 ring-1 ring-emerald-400/60 shadow-[0_8px_24px_rgba(16,185,129,0.25)]"
+                    : "text-white/60 hover:text-white hover:bg-white/[0.06]"
+                )}
+              >
+                <Icon className="w-5 h-5" />
+                {active ? (
+                  <span className="absolute left-1 w-1.5 h-7 rounded-full bg-gradient-to-b from-emerald-400 to-cyan-400" />
                 ) : null}
-              </div>
-              <div className="text-[10px] text-white/30 mt-0.5 pl-[0.875rem] flex items-center gap-2">
-                <span className="uppercase tracking-wider">
-                  {statusLabel[d.status]}
+                <span className="sr-only">{label}</span>
+                <span className="pointer-events-none absolute left-14 z-20 rounded-lg bg-white/10 backdrop-blur-md px-2 py-1 text-[11px] text-white/85 opacity-0 shadow-xl shadow-black/30 transition-opacity duration-150 group-hover:opacity-100">
+                  {label}
                 </span>
-                <span>·</span>
-                <span>{formatRelative(d.updated_at)}</span>
-              </div>
-              {d.labels && d.labels.length > 0 ? (
-                <div className="pl-[0.875rem] mt-1 flex flex-wrap gap-1">
-                  {d.labels.slice(0, 2).map((l) => (
-                    <span
-                      key={l}
-                      className="px-1 py-[1px] rounded-sm text-[9px] bg-white/[0.05] border border-white/[0.06] text-white/60"
-                    >
-                      {l}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-            </Link>
+              </Link>
             );
-          })
-        )}
-      </div>
+          })}
+        </nav>
 
-      {me ? (
-        <div className="px-3 py-3 border-t border-white/[0.06] flex items-center gap-2">
-          {me.avatar_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={me.avatar_url}
-              alt=""
-              className="w-7 h-7 rounded-full object-cover bg-white/[0.05]"
+        <div className="flex flex-col gap-2 pb-2">
+          <button
+            onClick={() => setRecentOpen((v) => !v)}
+            className="group relative flex items-center justify-center w-10 h-10 rounded-xl text-white/70 hover:text-white bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] transition-all"
+          >
+            <Clock3 className="w-5 h-5" />
+            <span className="sr-only">Recent drafts</span>
+            <span className="pointer-events-none absolute left-14 z-20 rounded-lg bg-white/10 backdrop-blur-md px-2 py-1 text-[11px] text-white/85 opacity-0 shadow-xl shadow-black/30 transition-opacity duration-150 group-hover:opacity-100">
+              Recent drafts
+            </span>
+          </button>
+
+          <button
+            onClick={() => setIdeaOpen(true)}
+            className="group relative flex items-center justify-center w-10 h-10 rounded-xl text-amber-50 bg-gradient-to-br from-emerald-500/25 to-cyan-500/25 border border-emerald-400/40 hover:from-emerald-500/35 hover:to-cyan-500/35 transition-all shadow-lg shadow-emerald-500/25"
+          >
+            <Lightbulb className="w-5 h-5" />
+            <span className="sr-only">Idea inbox</span>
+            <span className="pointer-events-none absolute left-14 z-20 rounded-lg bg-white/10 backdrop-blur-md px-2 py-1 text-[11px] text-white/85 opacity-0 shadow-xl shadow-black/30 transition-opacity duration-150 group-hover:opacity-100">
+              Idea inbox
+            </span>
+          </button>
+
+          {me ? (
+            <button
+              onClick={signOut}
+              disabled={signingOut}
+              className="group relative flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.08] border border-white/[0.08] text-[11px] text-white/80 hover:border-emerald-400/50 hover:text-emerald-50 transition-all"
+              title={me.full_name || me.email || "Account"}
+            >
+              {me.avatar_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={me.avatar_url}
+                  alt=""
+                  className="w-full h-full rounded-full object-cover"
+                />
+              ) : (
+                (me.full_name || me.email || "?").slice(0, 1).toUpperCase()
+              )}
+              <span className="pointer-events-none absolute left-14 z-20 rounded-lg bg-white/10 backdrop-blur-md px-2 py-1 text-[11px] text-white/85 opacity-0 shadow-xl shadow-black/30 transition-opacity duration-150 group-hover:opacity-100">
+                {signingOut ? "Signing out…" : "Sign out"}
+              </span>
+            </button>
+          ) : null}
+        </div>
+      </aside>
+
+      {ideaOpen ? (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setIdeaOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="absolute left-16 top-6 w-[320px] rounded-2xl border border-white/[0.12] bg-white/[0.12] backdrop-blur-xl shadow-2xl shadow-emerald-500/25 p-4 space-y-3"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-[12px] uppercase tracking-[0.08em] text-white/60">
+                  Idea inbox
+                </div>
+                <div className="text-[13px] text-white/85">
+                  Capture a spark, promote later.
+                </div>
+              </div>
+              <button
+                onClick={() => setIdeaOpen(false)}
+                className="text-[11px] text-white/50 hover:text-white/80"
+              >
+                Close
+              </button>
+            </div>
+            <textarea
+              value={ideaText}
+              onChange={(e) => setIdeaText(e.target.value)}
+              placeholder="Drop a thought, hook, or fragment…"
+              className="w-full rounded-xl bg-black/30 border border-white/[0.12] px-3 py-2 text-[13px] text-white/85 placeholder-white/35 focus:outline-none focus:border-emerald-400/60 min-h-[120px]"
             />
-          ) : (
-            <div className="w-7 h-7 rounded-full bg-white/[0.06] text-[10px] flex items-center justify-center text-white/60">
-              {(me.full_name || me.email || "?").slice(0, 1).toUpperCase()}
-            </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <div className="text-[12px] text-white/85 truncate">
-              {me.full_name || me.email}
-            </div>
-            <div className="text-[10px] text-white/35 truncate">
-              {me.provider || "signed in"}
+            {ideaMsg ? (
+              <div className="text-[12px] text-emerald-100 bg-emerald-500/10 border border-emerald-400/30 rounded-lg px-2 py-1">
+                {ideaMsg}
+              </div>
+            ) : null}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={captureIdea}
+                disabled={ideaSaving}
+                className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 text-black text-[12px] font-semibold hover:from-emerald-400 hover:to-cyan-400 disabled:opacity-50 transition-all"
+              >
+                {ideaSaving ? "Saving…" : "Save to Ideas"}
+              </button>
+              {ideaCreatedId ? (
+                <Link
+                  href={`/content/${ideaCreatedId}`}
+                  className="text-[12px] text-white/75 underline underline-offset-2 hover:text-white"
+                  onClick={() => setIdeaOpen(false)}
+                >
+                  Open draft →
+                </Link>
+              ) : null}
             </div>
           </div>
-          <button
-            onClick={signOut}
-            disabled={signingOut}
-            className="text-[10px] text-white/40 hover:text-white/85 disabled:opacity-40"
-            title="Sign out"
+        </div>
+      ) : null}
+
+      {recentOpen ? (
+        <div
+          className="fixed inset-0 z-30"
+          onClick={() => setRecentOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="absolute left-16 top-20 w-[360px] rounded-2xl border border-white/[0.12] bg-white/[0.1] backdrop-blur-xl shadow-2xl shadow-black/30 p-4 space-y-3"
           >
-            {signingOut ? "…" : "Sign out"}
-          </button>
+            <div className="flex items-center justify-between">
+              <div className="text-[12px] uppercase tracking-[0.08em] text-white/60">
+                Recent drafts
+              </div>
+              <Link
+                href="/content"
+                className="text-[11px] text-white/65 underline underline-offset-2 hover:text-white"
+              >
+                View all
+              </Link>
+            </div>
+            {recent === null ? (
+              <div className="text-[12px] text-white/55">Loading…</div>
+            ) : recent.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-white/[0.18] bg-black/30 p-3 text-[12px] text-white/60 text-center">
+                Your workspace is clear. Capture an idea or draft a post.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {recent.map((d) => {
+                  const isTypefully = Boolean(
+                    d.performance &&
+                      ((d.performance as Record<string, unknown>)
+                        .imported_from_typefully ||
+                        Array.isArray(
+                          (d.performance as Record<string, unknown>)
+                            .typefully_draft_ids
+                        ))
+                  );
+                  return (
+                    <Link
+                      key={d.id}
+                      href={`/content/${d.id}`}
+                      className="block rounded-xl border border-white/[0.12] bg-white/[0.05] px-3 py-2 hover:border-emerald-400/50 hover:bg-emerald-500/5 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className={cn(
+                            "shrink-0 w-2 h-2 rounded-full",
+                            statusDot[d.status]
+                          )}
+                        />
+                        <span className="text-[13px] text-white/90 truncate">
+                          {d.title || "Untitled"}
+                        </span>
+                        {isTypefully ? (
+                          <span className="shrink-0 text-[9px] text-white/50 uppercase tracking-wider border border-white/[0.15] rounded px-1.5">
+                            TF
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="text-[11px] text-white/45 mt-0.5 flex items-center gap-2">
+                        <span className="uppercase tracking-wide">
+                          {statusLabel[d.status]}
+                        </span>
+                        <span>·</span>
+                        <span>{formatRelative(d.updated_at)}</span>
+                        {d.labels && d.labels.length > 0 ? (
+                          <span className="truncate">
+                            · {d.labels.slice(0, 2).join(", ")}
+                          </span>
+                        ) : null}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
-      ) : (
-        <div className="px-4 py-2 border-t border-white/[0.06] text-[10px] text-white/30">
-          v0.5 · polish + flow
-        </div>
-      )}
-    </aside>
+      ) : null}
+    </>
   );
 }
 

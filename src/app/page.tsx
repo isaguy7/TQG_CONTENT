@@ -11,6 +11,7 @@ import { ClaudeStatusCard } from "@/components/ClaudeStatusCard";
 import { ProviderTokenCapture } from "@/components/ProviderTokenCapture";
 import { TypefullyAutoSync } from "@/components/TypefullyAutoSync";
 import Link from "next/link";
+import { Sparkles } from "lucide-react";
 import { getCurrentUser } from "@/lib/supabase-server";
 import { listConnections } from "@/lib/oauth-connections";
 
@@ -77,6 +78,7 @@ export default async function DashboardPage() {
       description="Lifetime and weekly metrics across every platform"
     >
       <ProviderTokenCapture />
+      <TypefullyAutoSync />
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <MetricCard
           label="Lifetime impressions"
@@ -132,17 +134,20 @@ export default async function DashboardPage() {
           {hasActiveConnection ? (
             <RecentPostsList posts={recentPosts} />
           ) : (
-            <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
-              <div className="section-label mb-3">Recent posts</div>
-              <p className="text-[13px] text-white/50 leading-relaxed">
-                No published performance data yet. Connect LinkedIn or X in{" "}
+            <div className="rounded-2xl bg-white/[0.05] border border-white/[0.08] p-5 backdrop-blur-md shadow-lg shadow-black/20 text-center">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-200 border border-emerald-400/40 mb-2">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div className="section-label mb-2">Recent posts</div>
+              <p className="text-[13px] text-white/70 leading-relaxed">
+                Your dashboard is quiet. Connect LinkedIn or X in{" "}
                 <Link
                   href="/settings"
-                  className="underline underline-offset-2 text-white/75 hover:text-white"
+                  className="underline underline-offset-2 text-white/85 hover:text-white"
                 >
                   Settings
                 </Link>{" "}
-                to start tracking impressions and engagement.
+                and capture an idea to fill this space.
               </p>
             </div>
           )}
@@ -162,7 +167,6 @@ export default async function DashboardPage() {
               <QuickLink href="/content/new?video=1" label="Transcribe video" />
             </div>
           </div>
-          <TypefullyAutoSync />
         </div>
       </section>
     </PageShell>
