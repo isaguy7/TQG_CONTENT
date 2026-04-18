@@ -135,6 +135,14 @@ export function IntegrationsDetail({
     load();
   }, [load]);
 
+  // Re-fetch whenever the client-side token capture hook persists a new
+  // connection so the UI flips to "Connected" without a manual reload.
+  useEffect(() => {
+    const handler = () => load();
+    window.addEventListener("oauth-connection-saved", handler);
+    return () => window.removeEventListener("oauth-connection-saved", handler);
+  }, [load]);
+
   const [providerError, setProviderError] = useState<string | null>(null);
 
   const reconnect = async (provider: "linkedin_oidc" | "x") => {

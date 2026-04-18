@@ -99,7 +99,15 @@ export function TranscribeWorkflow() {
   const [url, setUrl] = useState("");
   const [forceWhisper, setForceWhisper] = useState(false);
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
+  const [hosted, setHosted] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    fetch("/api/environment", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setHosted(!!j?.hosted))
+      .catch(() => setHosted(false));
+  }, []);
 
   const runTranscribe = useCallback(
     async (targetUrl: string, force: boolean) => {
@@ -217,7 +225,9 @@ export function TranscribeWorkflow() {
         className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4"
       >
         <label className="section-label block mb-2">
-          Video URL (YouTube, X, Instagram, most platforms)
+          {hosted
+            ? "YouTube URL (pulls existing captions — no GPU needed)"
+            : "Video URL (YouTube, X, Instagram, most platforms)"}
         </label>
         <div className="flex gap-2">
           <input
@@ -257,16 +267,24 @@ export function TranscribeWorkflow() {
             {busy ? "Cancel" : "Transcribe"}
           </button>
         </div>
-        <label className="mt-3 flex items-center gap-2 text-[12px] text-white/55 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={forceWhisper}
-            onChange={(e) => setForceWhisper(e.target.checked)}
-            disabled={busy}
-            className="accent-primary-hover"
-          />
-          Force WhisperX (skip YouTube captions, get word-level timestamps)
-        </label>
+        {hosted ? (
+          <p className="mt-3 text-[11px] text-white/45 leading-relaxed">
+            Hosted mode fetches YouTube&apos;s existing captions (auto or
+            manual) directly — no GPU required. WhisperX transcription is
+            available when you run the Studio locally.
+          </p>
+        ) : (
+          <label className="mt-3 flex items-center gap-2 text-[12px] text-white/55 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={forceWhisper}
+              onChange={(e) => setForceWhisper(e.target.checked)}
+              disabled={busy}
+              className="accent-primary-hover"
+            />
+            Force WhisperX (skip YouTube captions, get word-level timestamps)
+          </label>
+        )}
       </form>
 
       <PhaseStatus phase={phase} />

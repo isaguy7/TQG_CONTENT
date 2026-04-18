@@ -1,6 +1,7 @@
 import { PageShell } from "@/components/PageShell";
 import { ClaudeUsage } from "@/components/ClaudeUsage";
 import { IntegrationsDetail } from "@/components/IntegrationsDetail";
+import { ProviderTokenCapture } from "@/components/ProviderTokenCapture";
 import { SignOutButton } from "@/components/SignOutButton";
 
 export default function SettingsPage() {
@@ -9,6 +10,7 @@ export default function SettingsPage() {
       title="Settings"
       description="Integrations, API keys, model selection"
     >
+      <ProviderTokenCapture />
       <div className="space-y-4 max-w-2xl">
         <section className="rounded-lg border border-border bg-surface p-6">
           <h2 className="text-sm font-semibold mb-3">Connect your accounts</h2>

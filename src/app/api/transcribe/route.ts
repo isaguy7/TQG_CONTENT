@@ -2,7 +2,11 @@ import { NextRequest } from "next/server";
 import { downloadVideo, type YtDlpProgress, getMetadata } from "@/lib/ytdlp";
 import { extractAudioForWhisper } from "@/lib/ffmpeg";
 import { transcribe } from "@/lib/whisper";
-import { fetchYoutubeCaptions } from "@/lib/captions";
+import {
+  fetchYoutubeCaptions,
+  fetchYoutubeCaptionsHttp,
+  extractYoutubeVideoId,
+} from "@/lib/captions";
 import type { WhisperResult, WhisperSegment } from "@/lib/transcript";
 import { isHosted } from "@/lib/environment";
 
@@ -57,15 +61,6 @@ export async function POST(req: NextRequest) {
       } VERCEL_ENV=${process.env.VERCEL_ENV ?? "unset"}`
     );
   }
-  if (isHosted()) {
-    return new Response(
-      JSON.stringify({
-        error:
-          "Video transcription requires the local desktop app with GPU access. YouTube captions are still available on local runs.",
-      }),
-      { status: 501, headers: { "Content-Type": "application/json" } }
-    );
-  }
 
   let body: { url?: string; forceWhisper?: boolean };
   try {
@@ -84,6 +79,31 @@ export async function POST(req: NextRequest) {
       JSON.stringify({ error: "Missing or invalid 'url'" }),
       { status: 400, headers: { "Content-Type": "application/json" } }
     );
+  }
+
+  const hosted = isHosted();
+  // On hosted (Vercel) we can still do YouTube captions via HTTP — only
+  // WhisperX transcription requires the local GPU box. Reject anything that
+  // would need ffmpeg / yt-dlp / GPU here.
+  if (hosted) {
+    if (forceWhisper) {
+      return new Response(
+        JSON.stringify({
+          error:
+            "WhisperX requires the local desktop app with GPU access. YouTube captions still work here.",
+        }),
+        { status: 501, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    if (!extractYoutubeVideoId(url)) {
+      return new Response(
+        JSON.stringify({
+          error:
+            "Hosted mode can only fetch existing captions from YouTube URLs. For other sources, run the local Studio.",
+        }),
+        { status: 501, headers: { "Content-Type": "application/json" } }
+      );
+    }
   }
 
   const abortController = new AbortController();
@@ -112,7 +132,30 @@ export async function POST(req: NextRequest) {
         if (!forceWhisper) {
           send({ phase: "captions-try" });
           if (DEBUG_TRANSCRIBE) console.log(`[transcribe] captions-try url=${url}`);
-          const captions = await fetchYoutubeCaptions(url, "en", signal);
+
+          let captionsMeta: {
+            title: string;
+            duration: number | null;
+            channel: string | null;
+          } | null = null;
+          let captions: WhisperResult & { source: Source } | null = null;
+
+          if (hosted) {
+            // Vercel path — HTTP-only YouTube captions.
+            const httpCaps = await fetchYoutubeCaptionsHttp(url, "en", signal);
+            if (httpCaps) {
+              captions = httpCaps;
+              captionsMeta = {
+                title: httpCaps.title || "YouTube video",
+                duration: null,
+                channel: httpCaps.channel,
+              };
+            }
+          } else {
+            // Local path — yt-dlp can handle YouTube and other sources.
+            captions = await fetchYoutubeCaptions(url, "en", signal);
+          }
+
           if (DEBUG_TRANSCRIBE) {
             console.log(
               `[transcribe] captions result: ${
@@ -122,29 +165,43 @@ export async function POST(req: NextRequest) {
           }
           if (signal.aborted) return;
           if (captions) {
-            let meta: { title: string; duration: number | null; channel: string | null } = {
-              title: "video",
-              duration: null,
-              channel: null,
-            };
-            try {
-              const info = await getMetadata(url, signal);
-              meta = {
-                title: info.title,
-                duration: info.duration,
-                channel: info.channel,
+            if (!captionsMeta) {
+              captionsMeta = {
+                title: "video",
+                duration: null,
+                channel: null,
               };
-            } catch {}
+              try {
+                const info = await getMetadata(url, signal);
+                captionsMeta = {
+                  title: info.title,
+                  duration: info.duration,
+                  channel: info.channel,
+                };
+              } catch {}
+            }
             if (signal.aborted) return;
             send({
               phase: "done",
               source: captions.source,
               transcript: captions,
-              metadata: meta,
+              metadata: captionsMeta,
             });
             return;
           }
-          // Captions not available — surface to the client and stop here.
+
+          if (hosted) {
+            // On Vercel we can't fall through to WhisperX — surface a clear
+            // error rather than offering a GPU retry that will 501.
+            send({
+              phase: "error",
+              message:
+                "YouTube has no English captions for this video. Run the local Studio to transcribe with WhisperX.",
+            });
+            return;
+          }
+
+          // Captions not available locally — surface to the client and stop.
           // Client shows a 'Try WhisperX (GPU)?' prompt and resubmits with
           // forceWhisper=true if the user agrees.
           send({
