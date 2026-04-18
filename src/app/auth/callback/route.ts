@@ -70,7 +70,7 @@ function detectProviderPlatform(
 ): "linkedin" | "x" | null {
   if (!provider) return null;
   if (provider === "linkedin_oidc" || provider === "linkedin") return "linkedin";
-  if (provider === "twitter") return "x";
+  if (provider === "x" || provider === "twitter") return "x";
   return null;
 }
 
