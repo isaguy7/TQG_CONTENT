@@ -86,9 +86,6 @@ export function FigureAvailableRefs({
 
   const attachHadithToPost = async (ref: FigureHadithRef) => {
     if (!ref.hadith) return;
-    // Two-step: create a hadith_verifications row from the corpus entry,
-    // then attach it to the post. Both stay UNVERIFIED until the user
-    // manually verifies on /hadith before publishing.
     const createRes = await fetch("/api/hadith", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -114,7 +111,7 @@ export function FigureAvailableRefs({
       body: JSON.stringify({ hadith_id: hadith.id }),
     });
     if (attachRes.ok) {
-      setMessage("Attached · verify before publish");
+      setMessage("Attached");
       setTimeout(() => setMessage(null), 2000);
       onAttachedHadith();
     } else {

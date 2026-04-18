@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase";
-import {
-  assertPublishable,
-  PublishGateError,
-  publishGateErrorBody,
-} from "@/lib/publish-gate";
 import { recordPublished } from "@/lib/gap-alerts";
 import { isUuid } from "@/lib/utils";
 
@@ -49,12 +44,6 @@ export async function GET(_req: NextRequest, { params }: Params) {
   });
 }
 
-/**
- * PATCH /api/posts/[id]. Any mutation that sets status='ready' runs
- * through assertPublishable first (Node mirror of the DB trigger).
- * UI errors short-circuit here with a 422 and the list of unverified
- * hadith, instead of surfacing a raw DB trigger error later.
- */
 export async function PATCH(req: NextRequest, { params }: Params) {
   if (!isUuid(params.id)) {
     return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
@@ -71,6 +60,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     scheduled_for?: string | null;
     topic_tags?: string[];
     quran_refs?: unknown;
+    performance?: unknown;
     labels?: string[];
     deleted_at?: string | null;
   };
@@ -78,17 +68,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-
-  if (body.status === "ready") {
-    try {
-      await assertPublishable(params.id);
-    } catch (err) {
-      if (err instanceof PublishGateError) {
-        return NextResponse.json(publishGateErrorBody(err), { status: 422 });
-      }
-      throw err;
-    }
   }
 
   const update: Record<string, unknown> = {
@@ -106,6 +85,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     "scheduled_for",
     "topic_tags",
     "quran_refs",
+    "performance",
     "labels",
     "deleted_at",
   ];
@@ -125,18 +105,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     .single();
 
   if (error) {
-    // DB trigger backstop — if the Node gate missed a case, the trigger
-    // still rejects. Surface it cleanly.
-    if (/unverified hadith/i.test(error.message)) {
-      return NextResponse.json(
-        {
-          error: "publish_gate",
-          message: error.message,
-          unverified: [],
-        },
-        { status: 422 }
-      );
-    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
