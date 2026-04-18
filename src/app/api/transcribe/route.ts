@@ -11,9 +11,11 @@ import {
 import type { WhisperResult, WhisperSegment } from "@/lib/transcript";
 import { isHosted } from "@/lib/environment";
 
-const DEBUG_TRANSCRIBE =
-  process.env.TQG_TRANSCRIBE_DEBUG === "1" ||
-  process.env.NODE_ENV !== "production";
+// Emit diagnostic logs unless explicitly disabled. Vercel production runs
+// NODE_ENV=production and hides the dev-only logs — but the hosted path
+// is also where YouTube-IP-blocking / consent-page bugs surface, so we
+// need the logs in the Vercel dashboard by default.
+const DEBUG_TRANSCRIBE = process.env.TQG_TRANSCRIBE_DEBUG !== "0";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

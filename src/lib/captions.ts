@@ -266,12 +266,14 @@ export async function fetchYoutubeCaptionsHttp(
     );
   }
 
-  const debug =
-    process.env.TQG_CAPTIONS_DEBUG === "1" ||
-    process.env.NODE_ENV !== "production";
+  // Emit logs by default — Vercel production hides dev-only ones, but
+  // this is exactly where we need them (e.g. YouTube IP-blocking the
+  // host, serving consent interstitials). Opt out with TQG_CAPTIONS_DEBUG=0.
+  const debug = process.env.TQG_CAPTIONS_DEBUG !== "0";
   const log = (msg: string) => {
     if (debug) console.log(`[captions-http] ${msg}`);
   };
+  log(`videoId=${videoId} lang=${language}`);
 
   const watchUrl = `https://www.youtube.com/watch?v=${videoId}&hl=en`;
   log(`fetching ${watchUrl}`);
