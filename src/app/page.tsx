@@ -7,6 +7,7 @@ import {
   FigureRecommendation,
 } from "@/components/DashboardLive";
 import { IntegrationsBar } from "@/components/IntegrationsBar";
+import { TypefullySyncButton } from "@/components/TypefullySyncButton";
 import Link from "next/link";
 
 const recentPosts: RecentPost[] = [
@@ -117,6 +118,9 @@ export default function DashboardPage() {
               <QuickLink href="/content/new" label="New post" />
               <QuickLink href="/clips/new" label="New clip batch" />
               <QuickLink href="/video/new" label="New video project" />
+            </div>
+            <div className="mt-3 pt-3 border-t border-white/[0.05]">
+              <TypefullySyncButton />
             </div>
           </div>
         </div>

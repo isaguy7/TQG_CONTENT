@@ -9,6 +9,7 @@ type IntegrationsPayload = {
     anthropic?: { connected: boolean; model?: string };
     typefully?: { connected: boolean; social_set?: boolean };
     unsplash?: { connected: boolean };
+    pexels?: { connected: boolean };
     linkedin?: { connected: boolean; oauth_ready?: boolean };
     meta?: { connected: boolean; oauth_ready?: boolean };
     whisperx?: { model: string; device: string; batchSize: number };
@@ -109,7 +110,7 @@ export function IntegrationsDetail() {
         }
       />
       <Row
-        label="Typefully (X scheduler)"
+        label="Typefully (LinkedIn + X)"
         connected={!!i.typefully?.connected}
         envVar="TYPEFULLY_API_KEY · TYPEFULLY_SOCIAL_SET_ID"
         details={
@@ -129,10 +130,29 @@ export function IntegrationsDetail() {
         envVar="UNSPLASH_ACCESS_KEY"
       />
       <Row
-        label="LinkedIn"
-        connected={!!i.linkedin?.connected}
-        envVar="LINKEDIN_ACCESS_TOKEN"
-        details={[["OAuth ready", i.linkedin?.oauth_ready ? "yes" : "no"]]}
+        label="Pexels (stock video)"
+        connected={!!i.pexels?.connected}
+        envVar="PEXELS_API_KEY"
+      />
+      <Row
+        label={
+          i.typefully?.connected
+            ? "LinkedIn (via Typefully)"
+            : "LinkedIn"
+        }
+        connected={
+          !!i.linkedin?.connected || !!i.typefully?.connected
+        }
+        envVar={
+          i.typefully?.connected
+            ? "TYPEFULLY_API_KEY (Typefully publishes to LinkedIn)"
+            : "LINKEDIN_ACCESS_TOKEN"
+        }
+        details={
+          i.typefully?.connected
+            ? undefined
+            : [["OAuth ready", i.linkedin?.oauth_ready ? "yes" : "no"]]
+        }
       />
       <Row
         label="Meta (Instagram / Facebook)"
