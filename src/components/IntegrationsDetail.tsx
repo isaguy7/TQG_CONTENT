@@ -290,21 +290,20 @@ export function IntegrationsDetail({
       ) : null}
       {showServices ? (
         <>
-      <Row
-        label="Typefully (fallback scheduler)"
-        connected={!!i.typefully?.connected}
-        envVar="TYPEFULLY_API_KEY · TYPEFULLY_SOCIAL_SET_ID"
-        details={
-          i.typefully?.connected
-            ? [
-                [
-                  "Social set",
-                  i.typefully.social_set ? "configured" : "unset",
-                ],
-              ]
-            : undefined
-        }
-      />
+      {i.typefully?.connected ? (
+        <Row
+          label="Typefully (legacy)"
+          connected={!!i.typefully?.connected}
+          envVar="TYPEFULLY_API_KEY · TYPEFULLY_SOCIAL_SET_ID"
+          details={[
+            [
+              "Social set",
+              i.typefully.social_set ? "configured" : "unset",
+            ],
+            ["Note", "Legacy — prefer direct OAuth posting"],
+          ]}
+        />
+      ) : null}
       <Row
         label="Unsplash"
         connected={!!i.unsplash?.connected}
