@@ -65,6 +65,12 @@ export function IntegrationsBar() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    const handler = () => load();
+    window.addEventListener("oauth-connection-saved", handler);
+    return () => window.removeEventListener("oauth-connection-saved", handler);
+  }, [load]);
+
   if (!data) return null;
 
   const integrations = data.integrations || {};

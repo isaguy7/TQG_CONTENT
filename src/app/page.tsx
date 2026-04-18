@@ -7,6 +7,7 @@ import {
   FigureRecommendation,
 } from "@/components/DashboardLive";
 import { IntegrationsBar } from "@/components/IntegrationsBar";
+import { ProviderTokenCapture } from "@/components/ProviderTokenCapture";
 import { TypefullyAutoSync } from "@/components/TypefullyAutoSync";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/supabase-server";
@@ -74,6 +75,7 @@ export default async function DashboardPage() {
       title="Dashboard"
       description="Lifetime and weekly metrics across every platform"
     >
+      <ProviderTokenCapture />
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <MetricCard
           label="Lifetime impressions"
