@@ -16,11 +16,7 @@ import {
   type PlatformId,
 } from "@/lib/platform-rules";
 import { buildSystemPrompt, type FigureContext } from "@/lib/system-prompt";
-import {
-  linkedinToFacebook,
-  linkedinToInstagram,
-  linkedinToX,
-} from "@/lib/platform-convert";
+import { ConvertPreviews } from "@/components/ConvertPreviews";
 import { HookGenerator } from "@/components/HookGenerator";
 import { SlopChecker } from "@/components/SlopChecker";
 import { TypefullyPush } from "@/components/TypefullyPush";
@@ -78,7 +74,6 @@ export default function PostEditorPage() {
   const [copyMsg, setCopyMsg] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [corpusOpen, setCorpusOpen] = useState(false);
-  const [convertOpen, setConvertOpen] = useState(false);
   const initialLoadDone = useRef(false);
 
   const loadPost = useCallback(async () => {
@@ -436,22 +431,15 @@ export default function PostEditorPage() {
               </select>
             </label>
             <div className="flex-1" />
-            <button
-              onClick={() => setConvertOpen((v) => !v)}
-              className="px-2.5 py-1 rounded text-[11px] border border-white/[0.08] text-white/70 hover:text-white hover:bg-white/[0.04]"
-            >
-              {convertOpen ? "Hide previews" : "Preview on other platforms"}
-            </button>
           </div>
 
-          {convertOpen && post.platform === "linkedin" ? (
-            <ConvertPreviews content={draft} />
-          ) : convertOpen ? (
-            <div className="mt-3 text-[11px] text-white/40">
-              Conversion previews are available when the source platform is
-              LinkedIn.
-            </div>
-          ) : null}
+          <div className="mt-4 pt-3 border-t border-white/[0.06]">
+            <ConvertPreviews
+              content={draft}
+              fromPlatform={post.platform}
+              postId={post.id}
+            />
+          </div>
         </div>
 
         <AmbientSuggestions
@@ -647,47 +635,3 @@ export default function PostEditorPage() {
   );
 }
 
-function ConvertPreviews({ content }: { content: string }) {
-  if (!content.trim()) {
-    return (
-      <div className="mt-3 text-[11px] text-white/40">
-        Type something in the draft above to preview it on other platforms.
-      </div>
-    );
-  }
-  const items: Array<{ label: string; text: string; limit: number }> = [
-    { label: "X", text: linkedinToX(content), limit: PLATFORMS.x.charLimit },
-    {
-      label: "Instagram",
-      text: linkedinToInstagram(content),
-      limit: PLATFORMS.instagram.charLimit,
-    },
-    {
-      label: "Facebook",
-      text: linkedinToFacebook(content),
-      limit: PLATFORMS.facebook.charLimit,
-    },
-  ];
-  return (
-    <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
-      {items.map((it) => (
-        <div
-          key={it.label}
-          className="rounded-md border border-white/[0.06] bg-white/[0.02] p-2.5"
-        >
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[11px] font-medium text-white/75">
-              {it.label}
-            </span>
-            <span className="text-[10px] text-white/40 tabular-nums">
-              {it.text.length} / {it.limit.toLocaleString()}
-            </span>
-          </div>
-          <div className="text-[11px] text-white/75 whitespace-pre-wrap leading-relaxed">
-            {it.text}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
