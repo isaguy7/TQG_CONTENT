@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase-browser";
 import { cn } from "@/lib/utils";
 
 export type IntegrationKey =
@@ -12,13 +13,20 @@ export type IntegrationKey =
   | "unsplash"
   | "supabase";
 
+type OAuthState = {
+  account_name: string | null;
+  status: "active" | "expired" | "revoked";
+  token_expires_at: string | null;
+};
+
 type IntegrationsPayload = {
   integrations: {
     supabase?: { connected: boolean; url?: string | null };
     anthropic?: { connected: boolean; model?: string };
     typefully?: { connected: boolean; social_set?: boolean };
     unsplash?: { connected: boolean };
-    linkedin?: { connected: boolean; oauth_ready?: boolean };
+    linkedin?: { connected: boolean; oauth?: OAuthState | null };
+    x?: { connected: boolean; oauth?: OAuthState | null };
     meta?: { connected: boolean; oauth_ready?: boolean };
     whisperx?: { model: string; device: string; batchSize: number };
   };
@@ -28,12 +36,12 @@ type PlatformCard = {
   key: IntegrationKey;
   label: string;
   subLabel: string;
-  color: string; // tailwind bg class for the brand accent
-  connectVia: string; // the integration endpoint that proves connection
-  envVar: string;
-  oauthFlow: string;
+  color: string;
   connected: boolean;
-  extra?: string;
+  status?: OAuthState["status"];
+  oauthProvider?: "linkedin_oidc" | "twitter";
+  scopes?: string;
+  helper?: string;
 };
 
 export function IntegrationsBar() {
@@ -60,123 +68,107 @@ export function IntegrationsBar() {
   if (!data) return null;
 
   const integrations = data.integrations || {};
+  const linkedin = integrations.linkedin;
+  const x = integrations.x;
 
-  // LinkedIn + X both route through Typefully. When TYPEFULLY_API_KEY is
-  // set we collapse the two cards into a single "LinkedIn + X" tile so the
-  // UI matches reality and stops prompting the user for separate OAuth flows.
-  const viaTypefully = !!integrations.typefully?.connected;
-  const cards: PlatformCard[] = [];
-
-  if (viaTypefully) {
-    cards.push({
+  const cards: PlatformCard[] = [
+    {
       key: "linkedin",
-      label: "LinkedIn + X",
-      subLabel: "Connected via Typefully",
-      color: "bg-sky-500",
-      connectVia: "TYPEFULLY_API_KEY",
-      envVar: "TYPEFULLY_API_KEY",
-      oauthFlow: "Typefully API",
-      connected: true,
-      extra: integrations.typefully?.social_set
-        ? undefined
-        : "Set TYPEFULLY_SOCIAL_SET_ID to target the TQG social set.",
-    });
-  } else {
-    cards.push(
-      {
-        key: "linkedin",
-        label: "LinkedIn",
-        subLabel: "Originals + TQG Page",
-        color: "bg-sky-500",
-        connectVia: "LINKEDIN_ACCESS_TOKEN",
-        envVar: "LINKEDIN_ACCESS_TOKEN",
-        oauthFlow: "LinkedIn OAuth 2.0",
-        connected: !!integrations.linkedin?.connected,
-      },
-      {
-        key: "x",
-        label: "X",
-        subLabel: "Pushes via Typefully",
-        color: "bg-white",
-        connectVia: "TYPEFULLY_API_KEY",
-        envVar: "TYPEFULLY_API_KEY",
-        oauthFlow: "Typefully API",
-        connected: false,
-        extra: "Add TYPEFULLY_API_KEY to .env.local to enable both LinkedIn + X.",
-      }
-    );
-  }
-
-  cards.push(
+      label: "LinkedIn",
+      subLabel: linkedin?.oauth?.account_name
+        ? `Signed in as ${linkedin.oauth.account_name}`
+        : "Direct posting via OAuth",
+      color: "bg-[#0A66C2]",
+      connected: !!linkedin?.connected,
+      status: linkedin?.oauth?.status,
+      oauthProvider: "linkedin_oidc",
+      scopes: "openid profile email w_member_social",
+    },
+    {
+      key: "x",
+      label: "X",
+      subLabel: x?.oauth?.account_name
+        ? `Signed in as ${x.oauth.account_name}`
+        : "Direct posting via OAuth",
+      color: "bg-white",
+      connected: !!x?.connected,
+      status: x?.oauth?.status,
+      oauthProvider: "twitter",
+      scopes: "tweet.read tweet.write users.read offline.access",
+    },
     {
       key: "instagram",
       label: "Instagram",
       subLabel: "Reels via Meta Graph",
       color: "bg-pink-500",
-      connectVia: "META_ACCESS_TOKEN",
-      envVar: "META_ACCESS_TOKEN",
-      oauthFlow: "Meta OAuth (Instagram)",
       connected: !!integrations.meta?.connected,
+      helper: "META_ACCESS_TOKEN",
     },
     {
       key: "facebook",
       label: "Facebook",
       subLabel: "Shares via Meta Graph",
       color: "bg-indigo-500",
-      connectVia: "META_ACCESS_TOKEN",
-      envVar: "META_ACCESS_TOKEN",
-      oauthFlow: "Meta OAuth (Facebook)",
       connected: !!integrations.meta?.connected,
-    }
-  );
+      helper: "META_ACCESS_TOKEN",
+    },
+  ];
 
   return (
     <>
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {cards.map((c) => (
-          <div
-            key={c.key}
-            className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4 flex flex-col"
-          >
-            <div className="flex items-center gap-2">
-              <span className={cn("w-2.5 h-2.5 rounded-full", c.color)} />
-              <div>
-                <div className="text-[13px] font-semibold text-white/90">
-                  {c.label}
+        {cards.map((c) => {
+          const isExpired = c.status === "expired";
+          return (
+            <div
+              key={c.key}
+              className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4 flex flex-col"
+            >
+              <div className="flex items-center gap-2">
+                <span className={cn("w-2.5 h-2.5 rounded-full", c.color)} />
+                <div>
+                  <div className="text-[13px] font-semibold text-white/90">
+                    {c.label}
+                  </div>
+                  <div className="text-[11px] text-white/45">
+                    {c.subLabel}
+                  </div>
                 </div>
-                <div className="text-[11px] text-white/45">{c.subLabel}</div>
               </div>
-            </div>
-            <div className="mt-4 flex items-center justify-between">
-              {c.connected ? (
-                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-200 text-[11px]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  Connected
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-white/50 text-[11px]">
-                  Not connected
-                </span>
-              )}
-              <button
-                onClick={() => setOpenModal(c)}
-                className={cn(
-                  "px-2.5 py-1 rounded text-[11px] border transition-colors",
-                  c.connected
-                    ? "border-white/[0.08] text-white/60 hover:text-white/85"
-                    : "border-primary/50 text-primary-bright hover:bg-primary/15"
+              <div className="mt-4 flex items-center justify-between">
+                {c.connected ? (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-200 text-[11px]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    Connected
+                  </span>
+                ) : isExpired ? (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-500/15 border border-amber-400/30 text-amber-200 text-[11px]">
+                    Reconnect needed
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-white/50 text-[11px]">
+                    Not connected
+                  </span>
                 )}
-              >
-                {c.connected ? "Manage" : `Connect ${c.label}`}
-              </button>
-            </div>
-            {c.extra ? (
-              <div className="mt-3 pt-3 border-t border-white/[0.05] text-[11px] text-white/45 leading-relaxed">
-                {c.extra}
+                <button
+                  onClick={() => setOpenModal(c)}
+                  className={cn(
+                    "px-2.5 py-1 rounded text-[11px] border transition-colors",
+                    c.connected
+                      ? "border-white/[0.08] text-white/60 hover:text-white/85"
+                      : "border-primary/50 text-primary-bright hover:bg-primary/15"
+                  )}
+                >
+                  {c.connected
+                    ? "Manage"
+                    : isExpired
+                      ? "Reconnect"
+                      : `Connect ${c.label}`}
+                </button>
               </div>
-            ) : null}
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </section>
 
       {openModal ? (
@@ -193,13 +185,38 @@ export function IntegrationsBar() {
 function ConnectModal({
   platform,
   onClose,
-  onAfterConnect,
 }: {
   platform: PlatformCard;
   onClose: () => void;
   onAfterConnect: () => void;
 }) {
-  const [step, setStep] = useState<"explain" | "placeholder">("explain");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const startOAuth = async () => {
+    if (!platform.oauthProvider) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: platform.oauthProvider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/settings")}`,
+          scopes: platform.scopes,
+        },
+      });
+      if (error) {
+        setErr(error.message);
+        setBusy(false);
+      }
+    } catch (e) {
+      setErr((e as Error).message);
+      setBusy(false);
+    }
+  };
+
+  const oauthSupported = !!platform.oauthProvider;
 
   return (
     <div
@@ -222,101 +239,58 @@ function ConnectModal({
             <span className={cn("w-3 h-3 rounded-full", platform.color)} />
             <div>
               <div className="text-[15px] font-semibold text-white/90">
-                Connect {platform.label}
+                {platform.connected ? "Manage" : "Connect"} {platform.label}
               </div>
               <div className="text-[11px] text-white/50">
-                {platform.oauthFlow}
+                {oauthSupported ? "Supabase OAuth" : "Manual API key"}
               </div>
             </div>
           </div>
         </div>
 
-        {step === "explain" ? (
-          <div className="px-6 py-5 space-y-4">
-            <p className="text-[13px] text-white/75 leading-relaxed">
-              Connecting {platform.label} lets TQG Studio push scheduled posts,
-              pull analytics, and surface them in the Dashboard without leaving
-              this app.
-            </p>
-            <ul className="space-y-1.5 text-[12px] text-white/60 leading-relaxed">
-              <li className="flex gap-2">
-                <span className="text-primary-bright">•</span>
-                We only request the scopes needed for publishing + read-only
-                analytics.
-              </li>
-              <li className="flex gap-2">
-                <span className="text-primary-bright">•</span>
-                You can revoke access any time on the provider&apos;s settings
-                page.
-              </li>
-              <li className="flex gap-2">
-                <span className="text-primary-bright">•</span>
-                Your token is stored in{" "}
-                <code className="font-mono text-[11px] bg-black/40 px-1 rounded">
-                  .env.local
-                </code>{" "}
-                on this machine only.
-              </li>
-            </ul>
-            {platform.connected ? (
-              <div className="rounded bg-emerald-500/10 border border-emerald-400/20 text-emerald-200 text-[12px] p-2.5 leading-relaxed">
-                <strong>Already connected.</strong> Token detected in{" "}
-                <code className="font-mono">{platform.envVar}</code>.
+        <div className="px-6 py-5 space-y-4">
+          {oauthSupported ? (
+            <>
+              <p className="text-[13px] text-white/75 leading-relaxed">
+                Sign in with {platform.label} to let TQG Studio post on your
+                behalf. We only request the scopes needed for publishing —
+                you can revoke access from {platform.label}&apos;s settings at
+                any time.
+              </p>
+              <div className="rounded bg-black/40 border border-white/[0.05] p-2 text-[11px] text-white/55 font-mono">
+                Scopes: {platform.scopes}
               </div>
-            ) : null}
-            <div className="flex items-center gap-2 pt-2">
+              {err ? (
+                <div className="text-[12px] text-danger">{err}</div>
+              ) : null}
               <button
-                onClick={() => setStep("placeholder")}
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md font-medium text-[13px]",
-                  "bg-white text-black hover:bg-white/90 transition-colors"
-                )}
+                onClick={startOAuth}
+                disabled={busy}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-md font-medium text-[13px] bg-white text-black hover:bg-white/90 transition-colors disabled:opacity-50"
               >
                 <span className={cn("w-2 h-2 rounded-full", platform.color)} />
-                Sign in with {platform.label}
+                {busy ? "Redirecting…" : `Sign in with ${platform.label}`}
               </button>
-            </div>
-            <p className="text-[11px] text-white/40 text-center">
-              You&apos;ll be redirected to {platform.label.toLowerCase()}.com to
-              authorize
-            </p>
-          </div>
-        ) : (
-          <div className="px-6 py-5 space-y-3">
+            </>
+          ) : (
             <div className="rounded-md bg-amber-500/10 border border-amber-400/30 p-3">
               <div className="text-[12px] font-medium text-amber-200 mb-1">
-                OAuth integration coming soon
+                Manual setup
               </div>
               <p className="text-[12px] text-amber-100/80 leading-relaxed">
-                For now, add your API credentials to{" "}
+                {platform.label} doesn&apos;t support direct OAuth in TQG
+                Studio yet. Set the relevant env var in{" "}
                 <code className="font-mono text-[11px] bg-black/30 px-1 rounded">
                   .env.local
                 </code>{" "}
                 and restart the dev server:
               </p>
               <pre className="mt-2 p-2 rounded bg-black/40 text-[11px] text-white/85 overflow-x-auto font-mono">
-                {platform.envVar}=your_token_here
+                {platform.helper || "PROVIDER_ACCESS_TOKEN"}=your_token_here
               </pre>
             </div>
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={() => {
-                  onAfterConnect();
-                  onClose();
-                }}
-                className="flex-1 px-3 py-2 rounded-md text-[12px] bg-primary text-primary-foreground hover:bg-primary-hover"
-              >
-                I&apos;ve added the key — refresh
-              </button>
-              <button
-                onClick={onClose}
-                className="px-3 py-2 rounded-md text-[12px] border border-white/[0.08] text-white/70 hover:text-white/90"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
