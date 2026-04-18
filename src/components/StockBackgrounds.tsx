@@ -189,9 +189,19 @@ export function StockBackgrounds({
   }
   if (!available) {
     return (
-      <div className="rounded bg-white/[0.02] border border-white/[0.06] p-3 text-[12px] text-white/50 leading-relaxed">
-        {reason ||
-          "Stock-video search is off. Add PEXELS_API_KEY to .env.local to enable it."}
+      <div className="text-[12px] text-white/50 leading-relaxed">
+        Add <code className="font-mono text-[11px]">PEXELS_API_KEY</code> to{" "}
+        <code className="font-mono text-[11px]">.env.local</code> for stock
+        video backgrounds (free at{" "}
+        <a
+          href="https://www.pexels.com/api/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-2 hover:text-white/70"
+        >
+          pexels.com/api
+        </a>
+        ).
       </div>
     );
   }
