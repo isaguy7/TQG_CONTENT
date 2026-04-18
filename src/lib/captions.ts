@@ -226,6 +226,205 @@ export function parseVtt(vtt: string): WhisperSegment[] {
   return mergeAdjacent(segments);
 }
 
+/**
+ * HTTP-only YouTube caption fetcher for environments without yt-dlp
+ * (e.g. Vercel). Fetches the watch page, extracts the caption track list
+ * from `ytInitialPlayerResponse`, then pulls the timedtext XML and parses
+ * it into WhisperSegments. Prefers manual captions, falls back to ASR.
+ *
+ * Returns null if the URL isn't a YouTube video, or if no captions exist.
+ */
+export async function fetchYoutubeCaptionsHttp(
+  url: string,
+  language: string = "en",
+  signal?: AbortSignal
+): Promise<(CaptionResult & { title: string | null; channel: string | null }) | null> {
+  const videoId = extractYoutubeVideoId(url);
+  if (!videoId) return null;
+
+  const debug =
+    process.env.TQG_CAPTIONS_DEBUG === "1" ||
+    process.env.NODE_ENV === "development";
+  const log = (msg: string) => {
+    if (debug) console.log(`[captions-http] ${msg}`);
+  };
+
+  const watchUrl = `https://www.youtube.com/watch?v=${videoId}&hl=en`;
+  log(`fetching ${watchUrl}`);
+  const pageRes = await fetch(watchUrl, {
+    signal,
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+        "(KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      "Accept-Language": "en-US,en;q=0.9",
+    },
+  });
+  if (!pageRes.ok) {
+    log(`watch page HTTP ${pageRes.status}`);
+    return null;
+  }
+  const html = await pageRes.text();
+
+  const player = extractPlayerResponse(html);
+  if (!player) {
+    log("ytInitialPlayerResponse not found in page");
+    return null;
+  }
+
+  const tracks: CaptionTrack[] =
+    player?.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
+  if (!tracks.length) {
+    log("no caption tracks on video");
+    return null;
+  }
+
+  const picked = pickCaptionTrack(tracks, language);
+  if (!picked) {
+    log(`no track matched language=${language}`);
+    return null;
+  }
+  log(`picked track lang=${picked.languageCode} kind=${picked.kind ?? "manual"}`);
+
+  // Request JSON3 format — avoids XML parsing and gives reliable timings.
+  const trackUrl = new URL(picked.baseUrl);
+  trackUrl.searchParams.set("fmt", "json3");
+  const captionRes = await fetch(trackUrl.toString(), { signal });
+  if (!captionRes.ok) {
+    log(`timedtext HTTP ${captionRes.status}`);
+    return null;
+  }
+  const json = (await captionRes.json()) as Json3Response;
+  const segments = parseJson3(json);
+  if (segments.length === 0) {
+    log("timedtext parsed to 0 segments");
+    return null;
+  }
+
+  const isAuto = picked.kind === "asr";
+  const videoDetails = player?.videoDetails ?? {};
+  return {
+    language: picked.languageCode || language,
+    segments,
+    model: isAuto ? "youtube-auto-captions" : "youtube-manual-captions",
+    aligned: false,
+    source: isAuto ? "youtube-auto" : "youtube-manual",
+    title: typeof videoDetails.title === "string" ? videoDetails.title : null,
+    channel: typeof videoDetails.author === "string" ? videoDetails.author : null,
+  };
+}
+
+export function extractYoutubeVideoId(url: string): string | null {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, "");
+    if (host === "youtu.be") {
+      const id = u.pathname.slice(1).split("/")[0];
+      return /^[\w-]{11}$/.test(id) ? id : null;
+    }
+    if (!/youtube\.com$/.test(host) && !/youtube-nocookie\.com$/.test(host))
+      return null;
+    if (u.pathname === "/watch") {
+      const id = u.searchParams.get("v");
+      return id && /^[\w-]{11}$/.test(id) ? id : null;
+    }
+    const prefixes = ["/embed/", "/shorts/", "/live/", "/v/"];
+    for (const p of prefixes) {
+      if (u.pathname.startsWith(p)) {
+        const id = u.pathname.slice(p.length).split("/")[0];
+        return /^[\w-]{11}$/.test(id) ? id : null;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+type CaptionTrack = {
+  baseUrl: string;
+  languageCode: string;
+  kind?: "asr" | string;
+  name?: { simpleText?: string };
+};
+
+type PlayerResponse = {
+  captions?: {
+    playerCaptionsTracklistRenderer?: {
+      captionTracks?: CaptionTrack[];
+    };
+  };
+  videoDetails?: { title?: string; author?: string };
+};
+
+type Json3Event = {
+  tStartMs?: number;
+  dDurationMs?: number;
+  segs?: Array<{ utf8?: string; tOffsetMs?: number }>;
+};
+type Json3Response = { events?: Json3Event[] };
+
+function extractPlayerResponse(html: string): PlayerResponse | null {
+  // Two common embedding forms: `var ytInitialPlayerResponse = {...};`
+  // and `"ytInitialPlayerResponse": "{...}"` (stringified in ytcfg).
+  const m = html.match(
+    /ytInitialPlayerResponse\s*=\s*(\{[\s\S]*?\})\s*;\s*(?:var\s|<\/script>)/
+  );
+  if (m) {
+    try {
+      return JSON.parse(m[1]);
+    } catch {
+      /* fall through */
+    }
+  }
+  const m2 = html.match(/"playerResponse"\s*:\s*"(\{(?:\\.|[^"\\])*\})"/);
+  if (m2) {
+    try {
+      const unescaped = JSON.parse(`"${m2[1]}"`);
+      return JSON.parse(unescaped as string);
+    } catch {
+      /* fall through */
+    }
+  }
+  return null;
+}
+
+function pickCaptionTrack(
+  tracks: CaptionTrack[],
+  language: string
+): CaptionTrack | null {
+  const lang = language.toLowerCase();
+  const byLang = (t: CaptionTrack) =>
+    (t.languageCode || "").toLowerCase().startsWith(lang);
+  const manual = tracks.find((t) => byLang(t) && t.kind !== "asr");
+  if (manual) return manual;
+  const asr = tracks.find((t) => byLang(t) && t.kind === "asr");
+  if (asr) return asr;
+  // Fallback to any manual track, else any track.
+  return (
+    tracks.find((t) => t.kind !== "asr") ?? tracks[0] ?? null
+  );
+}
+
+function parseJson3(json: Json3Response): WhisperSegment[] {
+  const events = Array.isArray(json?.events) ? json.events : [];
+  const out: WhisperSegment[] = [];
+  for (const ev of events) {
+    if (typeof ev.tStartMs !== "number") continue;
+    if (!Array.isArray(ev.segs)) continue;
+    const text = ev.segs
+      .map((s) => s.utf8 ?? "")
+      .join("")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!text) continue;
+    const start = ev.tStartMs / 1000;
+    const end = start + Math.max(0, (ev.dDurationMs ?? 0) / 1000);
+    out.push({ start, end, text });
+  }
+  return out;
+}
+
 function cleanVttText(s: string): string {
   return s
     // Strip inline timing tags: <00:00:01.200>
