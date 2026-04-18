@@ -50,7 +50,19 @@ export async function GET(req: NextRequest) {
     );
 
     const session = data.session;
-    const provider = session.user?.app_metadata?.provider || "";
+    // app_metadata.provider is always the PRIMARY login method (email).
+    // Detect the OAuth provider that just completed by finding the most
+    // recently updated non-email identity.
+    const identities = session.user?.identities || [];
+    const oauthIdentity = identities
+      .filter((i) => i.provider !== "email")
+      .sort(
+        (a, b) =>
+          new Date(b.updated_at ?? 0).getTime() -
+          new Date(a.updated_at ?? 0).getTime()
+      )[0];
+    const provider =
+      oauthIdentity?.provider || session.user?.app_metadata?.provider || "";
     const platform = provider === "linkedin_oidc" ? "linkedin" : provider === "x" ? "x" : null;
 
     if (platform) {
