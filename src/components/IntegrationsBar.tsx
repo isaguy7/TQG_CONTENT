@@ -61,41 +61,53 @@ export function IntegrationsBar() {
 
   const integrations = data.integrations || {};
 
-  // LinkedIn and X both route through Typefully today. When
-  // TYPEFULLY_API_KEY is set the user can push to both, so treat
-  // that as "connected" for both cards.
+  // LinkedIn + X both route through Typefully. When TYPEFULLY_API_KEY is
+  // set we collapse the two cards into a single "LinkedIn + X" tile so the
+  // UI matches reality and stops prompting the user for separate OAuth flows.
   const viaTypefully = !!integrations.typefully?.connected;
-  const cards: PlatformCard[] = [
-    {
+  const cards: PlatformCard[] = [];
+
+  if (viaTypefully) {
+    cards.push({
       key: "linkedin",
-      label: "LinkedIn",
-      subLabel: viaTypefully
-        ? "Connected via Typefully"
-        : "Originals + TQG Page",
+      label: "LinkedIn + X",
+      subLabel: "Connected via Typefully",
       color: "bg-sky-500",
-      connectVia: viaTypefully
-        ? "TYPEFULLY_API_KEY"
-        : "LINKEDIN_ACCESS_TOKEN",
-      envVar: viaTypefully
-        ? "TYPEFULLY_API_KEY"
-        : "LINKEDIN_ACCESS_TOKEN",
-      oauthFlow: viaTypefully ? "Typefully API" : "LinkedIn OAuth 2.0",
-      connected:
-        viaTypefully || !!integrations.linkedin?.connected,
-    },
-    {
-      key: "x",
-      label: "X",
-      subLabel: "Pushes via Typefully",
-      color: "bg-white",
       connectVia: "TYPEFULLY_API_KEY",
       envVar: "TYPEFULLY_API_KEY",
       oauthFlow: "Typefully API",
-      connected: !!integrations.typefully?.connected,
+      connected: true,
       extra: integrations.typefully?.social_set
         ? undefined
-        : "Set TYPEFULLY_SOCIAL_SET_ID to target the TQG account.",
-    },
+        : "Set TYPEFULLY_SOCIAL_SET_ID to target the TQG social set.",
+    });
+  } else {
+    cards.push(
+      {
+        key: "linkedin",
+        label: "LinkedIn",
+        subLabel: "Originals + TQG Page",
+        color: "bg-sky-500",
+        connectVia: "LINKEDIN_ACCESS_TOKEN",
+        envVar: "LINKEDIN_ACCESS_TOKEN",
+        oauthFlow: "LinkedIn OAuth 2.0",
+        connected: !!integrations.linkedin?.connected,
+      },
+      {
+        key: "x",
+        label: "X",
+        subLabel: "Pushes via Typefully",
+        color: "bg-white",
+        connectVia: "TYPEFULLY_API_KEY",
+        envVar: "TYPEFULLY_API_KEY",
+        oauthFlow: "Typefully API",
+        connected: false,
+        extra: "Add TYPEFULLY_API_KEY to .env.local to enable both LinkedIn + X.",
+      }
+    );
+  }
+
+  cards.push(
     {
       key: "instagram",
       label: "Instagram",
@@ -115,8 +127,8 @@ export function IntegrationsBar() {
       envVar: "META_ACCESS_TOKEN",
       oauthFlow: "Meta OAuth (Facebook)",
       connected: !!integrations.meta?.connected,
-    },
-  ];
+    }
+  );
 
   return (
     <>

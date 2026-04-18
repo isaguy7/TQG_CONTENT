@@ -16,6 +16,7 @@ type LocalPost = {
   figure_id: string | null;
   labels: string[] | null;
   source: "local";
+  typefully?: boolean;
 };
 
 type TypefullyDraftView = {
@@ -370,6 +371,11 @@ export default function CalendarPage() {
                               )}
                               title={item.title || "(untitled)"}
                             >
+                              {item.typefully ? (
+                                <span className="text-[9px] mr-1 opacity-60">
+                                  TF
+                                </span>
+                              ) : null}
                               {item.title || "(untitled)"}
                             </Link>
                           );

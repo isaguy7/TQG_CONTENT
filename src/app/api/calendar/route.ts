@@ -105,17 +105,26 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     calendar,
     alerts,
-    posts: postsList.map((p) => ({
-      id: p.id,
-      title: p.title,
-      platform: p.platform,
-      status: p.status,
-      scheduled_for: p.scheduled_for,
-      published_at: p.published_at,
-      figure_id: p.figure_id,
-      labels: p.labels,
-      source: "local" as const,
-    })),
+    posts: postsList.map((p) => {
+      const perf = p.performance as Record<string, unknown> | null;
+      const fromTypefully = Boolean(
+        perf &&
+          (perf.imported_from_typefully ||
+            Array.isArray(perf.typefully_draft_ids))
+      );
+      return {
+        id: p.id,
+        title: p.title,
+        platform: p.platform,
+        status: p.status,
+        scheduled_for: p.scheduled_for,
+        published_at: p.published_at,
+        figure_id: p.figure_id,
+        labels: p.labels,
+        source: "local" as const,
+        typefully: fromTypefully,
+      };
+    }),
     typefully_drafts: typefullyDrafts,
     month: `${year}-${String(month + 1).padStart(2, "0")}`,
   });
