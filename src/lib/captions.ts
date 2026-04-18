@@ -226,79 +226,146 @@ export function parseVtt(vtt: string): WhisperSegment[] {
   return mergeAdjacent(segments);
 }
 
+export class CaptionsHttpError extends Error {
+  constructor(
+    message: string,
+    public readonly reason:
+      | "invalid_url"
+      | "watch_page_blocked"
+      | "player_not_parsed"
+      | "no_tracks"
+      | "language_not_found"
+      | "timedtext_blocked"
+      | "empty_timedtext"
+  ) {
+    super(message);
+    this.name = "CaptionsHttpError";
+  }
+}
+
 /**
  * HTTP-only YouTube caption fetcher for environments without yt-dlp
  * (e.g. Vercel). Fetches the watch page, extracts the caption track list
- * from `ytInitialPlayerResponse`, then pulls the timedtext XML and parses
+ * from `ytInitialPlayerResponse`, then pulls the timedtext feed and parses
  * it into WhisperSegments. Prefers manual captions, falls back to ASR.
  *
- * Returns null if the URL isn't a YouTube video, or if no captions exist.
+ * Throws CaptionsHttpError for each distinct failure mode so the calling
+ * route can surface precise messages — silently returning null made
+ * "nothing happened" bugs on Vercel hard to diagnose.
  */
 export async function fetchYoutubeCaptionsHttp(
   url: string,
   language: string = "en",
   signal?: AbortSignal
-): Promise<(CaptionResult & { title: string | null; channel: string | null }) | null> {
+): Promise<CaptionResult & { title: string | null; channel: string | null }> {
   const videoId = extractYoutubeVideoId(url);
-  if (!videoId) return null;
+  if (!videoId) {
+    throw new CaptionsHttpError(
+      `Not a recognised YouTube URL: ${url}`,
+      "invalid_url"
+    );
+  }
 
   const debug =
     process.env.TQG_CAPTIONS_DEBUG === "1" ||
-    process.env.NODE_ENV === "development";
+    process.env.NODE_ENV !== "production";
   const log = (msg: string) => {
     if (debug) console.log(`[captions-http] ${msg}`);
   };
 
   const watchUrl = `https://www.youtube.com/watch?v=${videoId}&hl=en`;
   log(`fetching ${watchUrl}`);
-  const pageRes = await fetch(watchUrl, {
-    signal,
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-        "(KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-      "Accept-Language": "en-US,en;q=0.9",
-    },
-  });
+  let pageRes: Response;
+  try {
+    pageRes = await fetch(watchUrl, {
+      signal,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+          "(KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+  } catch (err) {
+    log(`watch page fetch failed: ${(err as Error).message}`);
+    throw new CaptionsHttpError(
+      `Network error fetching YouTube page: ${(err as Error).message}`,
+      "watch_page_blocked"
+    );
+  }
   if (!pageRes.ok) {
     log(`watch page HTTP ${pageRes.status}`);
-    return null;
+    throw new CaptionsHttpError(
+      `YouTube returned HTTP ${pageRes.status} for the video page. ` +
+        `YouTube may be blocking requests from this host's IP.`,
+      "watch_page_blocked"
+    );
   }
   const html = await pageRes.text();
 
   const player = extractPlayerResponse(html);
   if (!player) {
-    log("ytInitialPlayerResponse not found in page");
-    return null;
+    log(
+      `ytInitialPlayerResponse not found in page (html length=${html.length})`
+    );
+    throw new CaptionsHttpError(
+      "Couldn't parse YouTube's player data. The page format may have " +
+        "changed, or YouTube served a consent/bot-check page.",
+      "player_not_parsed"
+    );
   }
 
   const tracks: CaptionTrack[] =
     player?.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
   if (!tracks.length) {
     log("no caption tracks on video");
-    return null;
+    throw new CaptionsHttpError(
+      "This video has no caption tracks at all (no auto-subs, no manual).",
+      "no_tracks"
+    );
   }
 
   const picked = pickCaptionTrack(tracks, language);
   if (!picked) {
-    log(`no track matched language=${language}`);
-    return null;
+    const available = tracks.map((t) => t.languageCode).join(", ");
+    log(`no track matched language=${language}; available=${available}`);
+    throw new CaptionsHttpError(
+      `No ${language} captions found. Available languages: ${available || "none"}.`,
+      "language_not_found"
+    );
   }
-  log(`picked track lang=${picked.languageCode} kind=${picked.kind ?? "manual"}`);
+  log(
+    `picked track lang=${picked.languageCode} kind=${picked.kind ?? "manual"}`
+  );
 
   // Request JSON3 format — avoids XML parsing and gives reliable timings.
   const trackUrl = new URL(picked.baseUrl);
   trackUrl.searchParams.set("fmt", "json3");
-  const captionRes = await fetch(trackUrl.toString(), { signal });
+  let captionRes: Response;
+  try {
+    captionRes = await fetch(trackUrl.toString(), { signal });
+  } catch (err) {
+    log(`timedtext fetch failed: ${(err as Error).message}`);
+    throw new CaptionsHttpError(
+      `Network error fetching captions: ${(err as Error).message}`,
+      "timedtext_blocked"
+    );
+  }
   if (!captionRes.ok) {
     log(`timedtext HTTP ${captionRes.status}`);
-    return null;
+    throw new CaptionsHttpError(
+      `YouTube returned HTTP ${captionRes.status} for the caption track.`,
+      "timedtext_blocked"
+    );
   }
   const json = (await captionRes.json()) as Json3Response;
   const segments = parseJson3(json);
   if (segments.length === 0) {
     log("timedtext parsed to 0 segments");
-    return null;
+    throw new CaptionsHttpError(
+      "YouTube returned an empty caption track.",
+      "empty_timedtext"
+    );
   }
 
   const isAuto = picked.kind === "asr";

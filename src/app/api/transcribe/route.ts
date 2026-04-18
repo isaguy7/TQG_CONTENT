@@ -6,6 +6,7 @@ import {
   fetchYoutubeCaptions,
   fetchYoutubeCaptionsHttp,
   extractYoutubeVideoId,
+  CaptionsHttpError,
 } from "@/lib/captions";
 import type { WhisperResult, WhisperSegment } from "@/lib/transcript";
 import { isHosted } from "@/lib/environment";
@@ -51,6 +52,25 @@ type Event =
 
 function encodeLine(ev: Event): Uint8Array {
   return new TextEncoder().encode(JSON.stringify(ev) + "\n");
+}
+
+function humaniseCaptionsError(err: CaptionsHttpError): string {
+  switch (err.reason) {
+    case "invalid_url":
+      return "That URL doesn't look like a YouTube video. Use a watch URL (youtube.com/watch?v=…) or youtu.be short link.";
+    case "watch_page_blocked":
+      return `${err.message} Try a different video, or run the Studio locally.`;
+    case "player_not_parsed":
+      return err.message;
+    case "no_tracks":
+      return "This video has no captions at all. Try a video that has auto-subs or manual captions, or run the local Studio to transcribe with WhisperX.";
+    case "language_not_found":
+      return err.message;
+    case "timedtext_blocked":
+      return err.message;
+    case "empty_timedtext":
+      return "YouTube returned an empty caption track — likely a transient issue, try again.";
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -142,14 +162,32 @@ export async function POST(req: NextRequest) {
 
           if (hosted) {
             // Vercel path — HTTP-only YouTube captions.
-            const httpCaps = await fetchYoutubeCaptionsHttp(url, "en", signal);
-            if (httpCaps) {
+            console.log(
+              `[transcribe] hosted path videoId=${extractYoutubeVideoId(url)} url=${url}`
+            );
+            try {
+              const httpCaps = await fetchYoutubeCaptionsHttp(url, "en", signal);
               captions = httpCaps;
               captionsMeta = {
                 title: httpCaps.title || "YouTube video",
                 duration: null,
                 channel: httpCaps.channel,
               };
+              console.log(
+                `[transcribe] hosted captions ok: ${httpCaps.source} ${httpCaps.segments.length} segs`
+              );
+            } catch (err) {
+              if (err instanceof CaptionsHttpError) {
+                console.error(
+                  `[transcribe] hosted captions failed reason=${err.reason} msg=${err.message}`
+                );
+                send({
+                  phase: "error",
+                  message: humaniseCaptionsError(err),
+                });
+                return;
+              }
+              throw err;
             }
           } else {
             // Local path — yt-dlp can handle YouTube and other sources.

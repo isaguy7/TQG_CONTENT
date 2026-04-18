@@ -206,30 +206,22 @@ function ConnectModal({
     try {
       const supabase = createClient();
       const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent("/settings")}`;
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
 
-      // Prefer linkIdentity when already signed in — avoids the PKCE
-      // state-cookie issues hit on X by not starting a fresh sign-in.
-      const { error } = user
-        ? await supabase.auth.linkIdentity({
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            provider: platform.oauthProvider as any,
-            options: { redirectTo, scopes: platform.scopes },
-          })
-        : await supabase.auth.signInWithOAuth({
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            provider: platform.oauthProvider as any,
-            options: { redirectTo, scopes: platform.scopes },
-          });
+      // Use signInWithOAuth, not linkIdentity: linkIdentity never surfaces a
+      // provider_token, so our ProviderTokenCapture would have nothing to
+      // save. signInWithOAuth triggers a fresh sign-in flow; if the identity
+      // is already linked to the current user, Supabase just refreshes the
+      // session on that same user rather than creating a new one.
+      const { error } = await supabase.auth.signInWithOAuth({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        provider: platform.oauthProvider as any,
+        options: { redirectTo, scopes: platform.scopes },
+      });
       if (error) {
         const raw = error.message || "";
         const msg = /not enabled|provider/i.test(raw)
           ? `${platform.label} sign-in isn't available yet. Ask the admin to enable the provider in Supabase.`
-          : /manual linking/i.test(raw)
-            ? `${platform.label} linking requires "Manual linking" to be enabled in Supabase → Auth → Settings.`
-            : raw;
+          : raw;
         setErr(msg);
         setBusy(false);
       }

@@ -155,39 +155,26 @@ export function IntegrationsDetail({
         : "tweet.read tweet.write users.read offline.access";
     const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent("/settings")}`;
 
-    // If the user is already signed in (they reached Settings), prefer
-    // linkIdentity — it attaches the provider to the existing account
-    // without starting a fresh sign-in flow, which sidesteps the PKCE
-    // state-cookie issues we were hitting with signInWithOAuth on X.
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    let error: { message: string } | null = null;
-    if (user) {
-      const { error: linkError } = await supabase.auth.linkIdentity({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        provider: provider as any,
-        options: { redirectTo, scopes },
-      });
-      error = linkError;
-    } else {
-      const { error: signInError } = await supabase.auth.signInWithOAuth({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        provider: provider as any,
-        options: { redirectTo, scopes },
-      });
-      error = signInError;
-    }
+    // IMPORTANT: always use signInWithOAuth here, not linkIdentity. The
+    // reason: linkIdentity is a pure linking op — Supabase never surfaces a
+    // provider_token to the resulting session, so ProviderTokenCapture has
+    // nothing to save into oauth_connections. signInWithOAuth kicks off a
+    // real sign-in, which DOES surface provider_token on the SIGNED_IN
+    // event. If the identity is already linked to the current user, the
+    // OAuth callback simply refreshes the session on the same user rather
+    // than creating a second one.
+    const { error } = await supabase.auth.signInWithOAuth({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      provider: provider as any,
+      options: { redirectTo, scopes },
+    });
 
     if (error) {
       const label = provider === "linkedin_oidc" ? "LinkedIn" : "X";
       const raw = error.message || "";
       const msg = /not enabled|provider/i.test(raw)
         ? `${label} sign-in isn't available yet. Ask the admin to enable the provider in Supabase.`
-        : /manual linking/i.test(raw)
-          ? `${label} linking requires "Manual linking" to be enabled in Supabase → Auth → Settings.`
-          : raw;
+        : raw;
       setProviderError(msg);
     }
     setBusy(null);

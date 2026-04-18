@@ -21,16 +21,30 @@ export default function SettingsPage() {
           <IntegrationsDetail mode="accounts" />
         </section>
 
-        <section className="rounded-lg border border-border bg-surface p-6">
-          <h2 className="text-sm font-semibold mb-3">Integrations</h2>
-          <p className="text-[12px] text-muted-foreground mb-4">
-            Source of truth for connection status — shared with the Dashboard.
-            Configure each via <code className="font-mono text-xs">.env.local</code>{" "}
-            (see <code className="font-mono text-xs">.env.local.example</code>)
-            and restart the dev server.
-          </p>
-          <IntegrationsDetail mode="services" />
-        </section>
+        <details className="rounded-lg border border-border bg-surface group">
+          <summary className="flex items-center justify-between cursor-pointer list-none px-6 py-4 select-none">
+            <div>
+              <h2 className="text-sm font-semibold">Integrations</h2>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Supabase, Anthropic, Typefully, Pexels, WhisperX — click to
+                expand.
+              </p>
+            </div>
+            <span className="text-white/40 text-[12px] tabular-nums transition-transform group-open:rotate-90">
+              ›
+            </span>
+          </summary>
+          <div className="px-6 pb-6 pt-1 border-t border-border/50">
+            <p className="text-[12px] text-muted-foreground mb-4 mt-3">
+              Source of truth for connection status — shared with the
+              Dashboard. Configure each via{" "}
+              <code className="font-mono text-xs">.env.local</code> (see{" "}
+              <code className="font-mono text-xs">.env.local.example</code>)
+              and restart the dev server.
+            </p>
+            <IntegrationsDetail mode="services" />
+          </div>
+        </details>
 
         <section className="rounded-lg border border-border bg-surface p-6">
           <h2 className="text-sm font-semibold mb-3">Claude API usage</h2>
