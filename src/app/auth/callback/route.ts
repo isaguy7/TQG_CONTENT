@@ -14,24 +14,31 @@ export async function GET(req: NextRequest) {
   const next = searchParams.get("next") ?? "/";
   const errorParam = searchParams.get("error");
 
+  // Vercel sits behind a load balancer — use x-forwarded-host to build the
+  // redirect URL so we don't bounce users back to localhost.
+  const forwardedHost = req.headers.get("x-forwarded-host");
+  const isLocalEnv = process.env.NODE_ENV === "development";
+  const base =
+    !isLocalEnv && forwardedHost ? `https://${forwardedHost}` : origin;
+
   if (errorParam) {
     const desc = searchParams.get("error_description") || errorParam;
+    const friendly = mapProviderError(desc);
     return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(desc)}`
+      `${base}/login?error=${encodeURIComponent(friendly)}`
     );
   }
 
   if (!code) {
-    return NextResponse.redirect(`${origin}/login?error=missing_code`);
+    return NextResponse.redirect(`${base}/login?error=missing_code`);
   }
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
   if (error || !data.session || !data.user) {
+    const friendly = mapProviderError(error?.message || "auth_failed");
     return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(
-        error?.message || "auth_failed"
-      )}`
+      `${base}/login?error=${encodeURIComponent(friendly)}`
     );
   }
 
@@ -62,7 +69,17 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(`${origin}${next}`);
+  return NextResponse.redirect(`${base}${next}`);
+}
+
+// Map raw provider error messages to user-friendly guidance. Keeps the raw
+// text as fallback so we never hide information entirely.
+function mapProviderError(raw: string): string {
+  const msg = raw.toLowerCase();
+  if (msg.includes("email") && msg.includes("external provider")) {
+    return "X connection failed: X didn't share your email address. Go to developer.x.com → your app → User Authentication Settings → enable 'Request email from users', then try again.";
+  }
+  return raw;
 }
 
 function detectProviderPlatform(
