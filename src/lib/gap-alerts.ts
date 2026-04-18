@@ -7,13 +7,7 @@
 import { getSupabaseServer } from "@/lib/supabase";
 
 export type GapAlert = {
-  kind:
-    | "no_x_clip"
-    | "sahabi_streak"
-    | "tqg_page_empty"
-    | "linkedin_stale"
-    | "instagram_stale"
-    | "figure_dormant";
+  kind: "figure_dormant";
   message: string;
 };
 
@@ -64,88 +58,11 @@ export async function ensureCurrentWeek(): Promise<WeeklyCalendar> {
 
 export async function computeGapAlerts(): Promise<GapAlert[]> {
   const db = getSupabaseServer();
-  const calendar = await ensureCurrentWeek();
-  if (!calendar) return [];
+  await ensureCurrentWeek();
   const alerts: GapAlert[] = [];
 
-  const since3d = new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString();
-
-  const { data: recentX } = await db
-    .from("posts")
-    .select("id")
-    .eq("status", "published")
-    .eq("platform", "x")
-    .gte("published_at", since3d);
-  if ((recentX || []).length === 0 && calendar.x_video_clips_actual === 0) {
-    alerts.push({
-      kind: "no_x_clip",
-      message: "No X clip posted in the last 3 days — algorithm momentum cooling.",
-    });
-  }
-
-  const { data: last3 } = await db
-    .from("posts")
-    .select("id,figure_id")
-    .eq("status", "published")
-    .order("published_at", { ascending: false })
-    .limit(3);
-  if ((last3 || []).length === 3) {
-    const figureIds = last3!.map((p) => p.figure_id).filter(Boolean) as string[];
-    if (figureIds.length === 3) {
-      const { data: figures } = await db
-        .from("islamic_figures")
-        .select("id,type")
-        .in("id", figureIds);
-      const allSahabi =
-        (figures || []).every((f) => f.type === "sahabi") &&
-        (figures || []).length === 3;
-      if (allSahabi) {
-        alerts.push({
-          kind: "sahabi_streak",
-          message:
-            "3 Sahabah posts in a row. Next post: surface a Prophet or scholar.",
-        });
-      }
-    }
-  }
-
-  if (calendar.tqg_reposts_actual === 0 && calendar.tqg_reposts_target > 0) {
-    alerts.push({
-      kind: "tqg_page_empty",
-      message: `TQG Page has 0 posts this week (target: ${calendar.tqg_reposts_target}).`,
-    });
-  }
-
-  const since4d = new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString();
-  const { data: recentLi } = await db
-    .from("posts")
-    .select("id")
-    .eq("status", "published")
-    .eq("platform", "linkedin")
-    .gte("published_at", since4d);
-  if ((recentLi || []).length === 0) {
-    alerts.push({
-      kind: "linkedin_stale",
-      message: "No LinkedIn original in 4+ days.",
-    });
-  }
-
-  // Instagram Reels: 3-5/week for growth. Flag if we've had zero in
-  // the past 7 days since a weekly cadence is the baseline.
-  const since7d = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-  const { data: recentIg } = await db
-    .from("posts")
-    .select("id")
-    .eq("status", "published")
-    .eq("platform", "instagram")
-    .gte("published_at", since7d);
-  if ((recentIg || []).length === 0) {
-    alerts.push({
-      kind: "instagram_stale",
-      message: "No Instagram Reel in the last 7 days — target is 3-5/week.",
-    });
-  }
-
+  // Informational suggestion only: surface figures we haven't posted about
+  // in a while. Never a restriction — purely a nudge for figure variety.
   const since30d = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
   const { data: dormant } = await db
     .from("islamic_figures")
