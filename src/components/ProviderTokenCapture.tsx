@@ -59,10 +59,24 @@ export function ProviderTokenCapture({
       }
 
       const user = session.user;
-      const provider = (user.app_metadata?.provider as string | undefined) || "";
+      // app_metadata.provider is always the PRIMARY login method (email).
+      // To find which OAuth provider just completed, find the most recently
+      // updated non-email identity.
+      const identities = user.identities || [];
+      const oauthIdentity = identities
+        .filter((i: { provider?: string }) => i.provider !== "email")
+        .sort(
+          (a: { updated_at?: string }, b: { updated_at?: string }) =>
+            new Date(b.updated_at ?? 0).getTime() -
+            new Date(a.updated_at ?? 0).getTime()
+        )[0];
+      const provider =
+        oauthIdentity?.provider ||
+        (user.app_metadata?.provider as string | undefined) ||
+        "";
       if (!provider) {
         console.log(
-          `[ProviderTokenCapture] ${trigger} — no provider in app_metadata, skipping`
+          `[ProviderTokenCapture] ${trigger} — no provider in identities or app_metadata, skipping`
         );
         return;
       }
@@ -141,8 +155,21 @@ export function ProviderTokenCapture({
       // classify the token into linkedin / x and pull a display name.
       const { data } = await supabase.auth.getSession();
       const session = data?.session ?? null;
+      // app_metadata.provider is always the PRIMARY login method (email).
+      // Detect the OAuth provider from the most recently updated non-email
+      // identity instead.
+      const identities = session?.user?.identities || [];
+      const oauthIdentity = identities
+        .filter((i: { provider?: string }) => i.provider !== "email")
+        .sort(
+          (a: { updated_at?: string }, b: { updated_at?: string }) =>
+            new Date(b.updated_at ?? 0).getTime() -
+            new Date(a.updated_at ?? 0).getTime()
+        )[0];
       const provider =
-        (session?.user?.app_metadata?.provider as string | undefined) || "";
+        oauthIdentity?.provider ||
+        (session?.user?.app_metadata?.provider as string | undefined) ||
+        "";
       if (!provider) {
         console.log(
           "[ProviderTokenCapture] hash — no provider in session, skipping"
