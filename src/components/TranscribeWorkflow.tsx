@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TranscriptViewer } from "@/components/TranscriptViewer";
 import type { WhisperResult, WhisperSegment } from "@/lib/transcript";
 import { buildSystemPrompt } from "@/lib/system-prompt";
+import { localStudioLink } from "@/lib/local-studio";
 import { cn } from "@/lib/utils";
 
 type Source = "youtube-auto" | "youtube-manual" | "whisperx";
@@ -287,11 +288,14 @@ export function TranscribeWorkflow() {
           </button>
         </div>
         {hosted ? (
-          <p className="mt-3 text-[11px] text-white/45 leading-relaxed">
-            Hosted mode fetches YouTube&apos;s existing captions (auto or
-            manual) directly — no GPU required. WhisperX transcription is
-            available when you run the Studio locally.
-          </p>
+          <div className="mt-3 space-y-2">
+            <p className="text-[11px] text-white/45 leading-relaxed">
+              Hosted mode fetches YouTube&apos;s existing captions (auto or
+              manual) directly — no GPU required. WhisperX transcription is
+              available when you run the Studio locally.
+            </p>
+            <OpenInLocalStudio url={url} />
+          </div>
         ) : (
           <label className="mt-3 flex items-center gap-2 text-[12px] text-white/55 cursor-pointer select-none">
             <input
@@ -417,6 +421,32 @@ function reducePhase(prev: Phase, ev: ServerEvent): Phase {
         traceback: ev.traceback,
       };
   }
+}
+
+/**
+ * Small "Open in Local Studio" helper for hosted mode. Rendered inline
+ * next to the transcribe button so the user has an escape hatch when the
+ * video has no captions (or they want word-level timestamps via WhisperX).
+ * Reads the saved URL from localStorage; renders nothing when unset.
+ */
+function OpenInLocalStudio({ url }: { url: string }) {
+  const [href, setHref] = useState<string | null>(null);
+  useEffect(() => {
+    setHref(
+      localStudioLink("/content/new", url.trim() ? { url: url.trim() } : undefined)
+    );
+  }, [url]);
+  if (!href) return null;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-2 px-2.5 py-1 rounded text-[11px] border border-sky-400/30 bg-sky-500/10 text-sky-200 hover:bg-sky-500/15"
+    >
+      Open in Local Studio <span aria-hidden>↗</span>
+    </a>
+  );
 }
 
 function CaptionsNotFoundPanel({

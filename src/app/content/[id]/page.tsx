@@ -326,6 +326,21 @@ export default function PostEditorPage() {
           </div>
         </div>
 
+        {/* Hooks live ABOVE the editor so they feel like the starting
+            move for a draft, not an afterthought. HookGenerator auto-hides
+            itself when the Claude API isn't configured. */}
+        <HookGenerator
+          postId={post.id}
+          onPick={(h) => {
+            save({ hook_selected: h.text });
+            if (!draft.trim()) {
+              setDraft(h.text + "\n\n");
+            } else {
+              setDraft(h.text + "\n\n" + draft);
+            }
+          }}
+        />
+
         <div
           className="rounded-xl border border-white/[0.06] p-6 shadow-lg shadow-black/10"
           style={{
@@ -517,18 +532,6 @@ export default function PostEditorPage() {
             onAttachedAyah={loadPost}
           />
         ) : null}
-
-        <HookGenerator
-          postId={post.id}
-          onPick={(h) => {
-            save({ hook_selected: h.text });
-            if (!draft.trim()) {
-              setDraft(h.text + "\n\n");
-            } else {
-              setDraft(h.text + "\n\n" + draft);
-            }
-          }}
-        />
 
         <SlopChecker content={draft} postId={post.id} />
 
