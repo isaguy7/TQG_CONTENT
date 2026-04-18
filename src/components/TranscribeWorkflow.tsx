@@ -145,6 +145,25 @@ export function TranscribeWorkflow() {
         });
 
         if (controller.signal.aborted) return;
+        // Non-streaming early rejections (400 / 501) come back as a single
+        // JSON object with {error}, not NDJSON. If we tried to feed that
+        // through reducePhase, it would silently drop (no matching phase)
+        // and leave the UI stuck on 'Starting…'. Handle those up front.
+        if (!res.ok) {
+          let message = `Transcribe failed (HTTP ${res.status})`;
+          try {
+            const body = await res.clone().json();
+            if (body && typeof body.error === "string") message = body.error;
+          } catch {
+            try {
+              const text = await res.text();
+              if (text) message = text.slice(0, 500);
+            } catch {}
+          }
+          console.error(`[TranscribeWorkflow] /api/transcribe ${res.status}: ${message}`);
+          safeSetPhase({ kind: "error", message });
+          return;
+        }
         if (!res.body) throw new Error("No response stream");
 
         const reader = res.body.getReader();
