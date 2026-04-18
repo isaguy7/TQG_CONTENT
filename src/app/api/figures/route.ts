@@ -23,9 +23,19 @@ export async function GET() {
   for (const id of ids) counts[id] = { hadith: 0, quran: 0 };
 
   if (ids.length > 0) {
+    // Default PostgREST row cap is 1000, so raise it explicitly — a single
+    // figure can easily have hundreds of linked hadith.
     const [{ data: hadithRows }, { data: quranRows }] = await Promise.all([
-      db.from("figure_hadith_refs").select("figure_id").in("figure_id", ids),
-      db.from("figure_quran_refs").select("figure_id").in("figure_id", ids),
+      db
+        .from("figure_hadith_refs")
+        .select("figure_id")
+        .in("figure_id", ids)
+        .limit(100000),
+      db
+        .from("figure_quran_refs")
+        .select("figure_id")
+        .in("figure_id", ids)
+        .limit(100000),
     ]);
     for (const r of hadithRows || []) {
       const bucket = counts[r.figure_id as string];
