@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AyahTools } from "@/components/AyahTools";
 
 type CorpusRow = {
   id: string;

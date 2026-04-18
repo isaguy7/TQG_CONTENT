@@ -47,6 +47,16 @@
   ::after {
     border-color: rgba(255, 255, 255, 0.06);
   }
+
+  /* Make <select> dropdown options readable.
+     Native <option> elements inherit OS defaults — on dark themes they
+     default to black-on-black. Force a legible palette so every select
+     across the app is usable without touching each one. */
+  select option,
+  select optgroup {
+    background-color: #1a1a1f;
+    color: rgba(255, 255, 255, 0.88);
+  }
 }
 
 @layer components {
