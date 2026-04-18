@@ -9,6 +9,10 @@ import {
 import { IntegrationsBar } from "@/components/IntegrationsBar";
 import { TypefullyAutoSync } from "@/components/TypefullyAutoSync";
 import Link from "next/link";
+import { getCurrentUser } from "@/lib/supabase-server";
+import { listConnections } from "@/lib/oauth-connections";
+
+export const dynamic = "force-dynamic";
 
 const recentPosts: RecentPost[] = [
   {
@@ -58,7 +62,13 @@ const recentPosts: RecentPost[] = [
   },
 ];
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const user = await getCurrentUser();
+  const conns = user ? await listConnections(user.id) : [];
+  const hasActiveConnection = conns.some((c) => c.status === "active");
+
+  const noConnHint = "Connect LinkedIn or X in Settings";
+
   return (
     <PageShell
       title="Dashboard"
@@ -67,27 +77,37 @@ export default function DashboardPage() {
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <MetricCard
           label="Lifetime impressions"
-          value="142.8k"
-          hint="All platforms combined"
+          value={hasActiveConnection ? "142.8k" : "—"}
+          hint={hasActiveConnection ? "All platforms combined" : noConnHint}
         />
         <MetricCard
           label="Total followers"
-          value="2,453"
-          hint="LinkedIn + TQG + X + IG/FB"
+          value={hasActiveConnection ? "2,453" : "—"}
+          hint={
+            hasActiveConnection
+              ? "LinkedIn + TQG + X + IG/FB"
+              : noConnHint
+          }
         />
         <MetricCard
           label="This week"
-          value="12.4k"
-          delta="+18.3%"
-          deltaDirection="up"
-          hint="Impressions vs last week"
+          value={hasActiveConnection ? "12.4k" : "—"}
+          delta={hasActiveConnection ? "+18.3%" : undefined}
+          deltaDirection={hasActiveConnection ? "up" : undefined}
+          hint={
+            hasActiveConnection ? "Impressions vs last week" : noConnHint
+          }
         />
         <MetricCard
           label="Engagement rate"
-          value="3.2%"
-          delta="+0.4%"
-          deltaDirection="up"
-          hint="7-day avg vs prior 7-day"
+          value={hasActiveConnection ? "3.2%" : "—"}
+          delta={hasActiveConnection ? "+0.4%" : undefined}
+          deltaDirection={hasActiveConnection ? "up" : undefined}
+          hint={
+            hasActiveConnection
+              ? "7-day avg vs prior 7-day"
+              : noConnHint
+          }
         />
       </section>
 
@@ -106,11 +126,29 @@ export default function DashboardPage() {
 
       <section className="grid grid-cols-1 lg:grid-cols-5 gap-3">
         <div className="lg:col-span-3">
-          <RecentPostsList posts={recentPosts} />
+          {hasActiveConnection ? (
+            <RecentPostsList posts={recentPosts} />
+          ) : (
+            <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
+              <div className="section-label mb-3">Recent posts</div>
+              <p className="text-[13px] text-white/50 leading-relaxed">
+                No published performance data yet. Connect LinkedIn or X in{" "}
+                <Link
+                  href="/settings"
+                  className="underline underline-offset-2 text-white/75 hover:text-white"
+                >
+                  Settings
+                </Link>{" "}
+                to start tracking impressions and engagement.
+              </p>
+            </div>
+          )}
         </div>
         <div className="lg:col-span-2 space-y-3">
           <LiveWeeklyAndAlerts />
-          <HookPerformance tier1Avg={4117} tier2Avg={475} />
+          {hasActiveConnection ? (
+            <HookPerformance tier1Avg={4117} tier2Avg={475} />
+          ) : null}
           <FigureRecommendation />
           <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
             <div className="section-label mb-3">Quick create</div>
