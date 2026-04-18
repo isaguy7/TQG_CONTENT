@@ -25,7 +25,8 @@ import { HookGenerator } from "@/components/HookGenerator";
 import { SlopChecker } from "@/components/SlopChecker";
 import { TypefullyPush } from "@/components/TypefullyPush";
 import { ImagePicker } from "@/components/ImagePicker";
-import { FigureAvailableRefs } from "@/components/FigureAvailableRefs";
+import { FigureContextPanel } from "@/components/FigureContextPanel";
+import { FigurePicker } from "@/components/FigurePicker";
 import { AmbientSuggestions } from "@/components/AmbientSuggestions";
 import { PostLabels } from "@/components/PostLabels";
 
@@ -291,21 +292,6 @@ export default function PostEditorPage() {
       }
     >
       <div className="max-w-2xl mx-auto space-y-6">
-        {figure ? (
-          <div className="flex items-center justify-center">
-            <Link
-              href={`/figures`}
-              className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/[0.08] bg-white/[0.03] text-[11px] text-white/70 hover:text-white hover:bg-white/[0.05]"
-            >
-              <span className="text-white/40">About:</span>
-              <span className="font-medium">{figure.name_en}</span>
-              {figure.name_ar ? (
-                <span className="text-white/40">· {figure.name_ar}</span>
-              ) : null}
-            </Link>
-          </div>
-        ) : null}
-
         <div>
           <input
             value={post.title || ""}
@@ -322,6 +308,24 @@ export default function PostEditorPage() {
               onChange={(labels) => {
                 setPost({ ...post, labels });
                 save({ labels } as Partial<Post>);
+              }}
+            />
+          </div>
+          <div className="mt-3">
+            <FigurePicker
+              value={post.figure_id}
+              onChange={async (nextId) => {
+                setPost({ ...post, figure_id: nextId });
+                await save({ figure_id: nextId } as Partial<Post>);
+                if (!nextId) {
+                  setFigure(null);
+                } else {
+                  const fRes = await fetch(`/api/figures/${nextId}`).catch(() => null);
+                  if (fRes && fRes.ok) {
+                    const { figure } = (await fRes.json()) as { figure: Figure };
+                    setFigure(figure);
+                  }
+                }
               }}
             />
           </div>
@@ -501,12 +505,20 @@ export default function PostEditorPage() {
         />
 
         {figure ? (
-          <FigureAvailableRefs
+          <FigureContextPanel
             figureId={figure.id}
-            figureName={figure.name_en}
             postId={post.id}
             attachedHadithIds={attachedIds}
+            onPickHookAngle={(text) => {
+              save({ hook_selected: text });
+              if (!draft.trim()) {
+                setDraft(text + "\n\n");
+              } else {
+                setDraft(text + "\n\n" + draft);
+              }
+            }}
             onAttachedHadith={loadPost}
+            onAttachedAyah={loadPost}
           />
         ) : null}
 
