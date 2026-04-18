@@ -12,6 +12,7 @@ export type GapAlert = {
     | "sahabi_streak"
     | "tqg_page_empty"
     | "linkedin_stale"
+    | "instagram_stale"
     | "figure_dormant";
   message: string;
 };
@@ -126,6 +127,22 @@ export async function computeGapAlerts(): Promise<GapAlert[]> {
     alerts.push({
       kind: "linkedin_stale",
       message: "No LinkedIn original in 4+ days.",
+    });
+  }
+
+  // Instagram Reels: 3-5/week for growth. Flag if we've had zero in
+  // the past 7 days since a weekly cadence is the baseline.
+  const since7d = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const { data: recentIg } = await db
+    .from("posts")
+    .select("id")
+    .eq("status", "published")
+    .eq("platform", "instagram")
+    .gte("published_at", since7d);
+  if ((recentIg || []).length === 0) {
+    alerts.push({
+      kind: "instagram_stale",
+      message: "No Instagram Reel in the last 7 days — target is 3-5/week.",
     });
   }
 

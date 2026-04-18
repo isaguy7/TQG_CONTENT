@@ -1,12 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { PageShell } from "@/components/PageShell";
 import { TranscribeWorkflow } from "@/components/TranscribeWorkflow";
 
 export default function NewPostPage() {
+  return (
+    <Suspense
+      fallback={
+        <PageShell title="New post">
+          <div className="text-[13px] text-white/40">Loading…</div>
+        </PageShell>
+      }
+    >
+      <NewPostInner />
+    </Suspense>
+  );
+}
+
+function NewPostInner() {
   const router = useRouter();
   const params = useSearchParams();
   const scheduledDate = params.get("date");
