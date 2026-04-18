@@ -89,7 +89,6 @@ export async function POST(req: NextRequest) {
       arabic_text: body.arabic_text || null,
       translation_en: body.translation_en || null,
       grade: body.grade || null,
-      verified: false,
     })
     .select()
     .single();

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+import { AyahTools } from "@/components/AyahTools";
+import { useSurahs } from "@/components/SurahPicker";
 
 type CorpusRow = {
   id: string;
@@ -69,6 +71,11 @@ export function FigureQuranSection({
   const [searching, setSearching] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const debouncedKeyword = useDebounced(keywordInput, 350);
+  const surahs = useSurahs();
+  const surahByNum = useMemo(
+    () => new Map(surahs.map((s) => [s.surah, s])),
+    [surahs]
+  );
 
   const load = useCallback(async () => {
     try {
@@ -274,9 +281,17 @@ export function FigureQuranSection({
               className="p-3 rounded border border-white/[0.06] bg-white/[0.02]"
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] uppercase tracking-wider text-primary-bright">
-                  {r.verse_key}
-                </span>
+                <div>
+                  <span className="text-[11px] uppercase tracking-wider text-primary-bright">
+                    {r.verse_key}
+                  </span>
+                  {surahByNum.get(r.surah) ? (
+                    <span className="ml-2 text-[11px] text-white/55">
+                      {surahByNum.get(r.surah)!.name_transliteration} ·{" "}
+                      {surahByNum.get(r.surah)!.name_english}
+                    </span>
+                  ) : null}
+                </div>
                 <button
                   onClick={() => removeRef(r.verse_key)}
                   className="text-[11px] text-white/40 hover:text-danger"
@@ -293,10 +308,11 @@ export function FigureQuranSection({
                     {r.ayah_data.text_uthmani}
                   </div>
                   {r.ayah_data.translation_en ? (
-                    <div className="text-[12px] text-white/60 leading-relaxed">
+                    <div className="text-[12px] text-white/60 leading-relaxed mb-2">
                       {r.ayah_data.translation_en}
                     </div>
                   ) : null}
+                  <AyahTools surah={r.surah} ayah={r.ayah} />
                 </>
               ) : (
                 <div className="text-[11px] text-white/40">

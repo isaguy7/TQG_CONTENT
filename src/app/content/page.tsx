@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PageShell } from "@/components/PageShell";
+import { TypefullySyncButton } from "@/components/TypefullySyncButton";
 import { cn } from "@/lib/utils";
 
 type PostStatus =
@@ -168,13 +169,16 @@ export default function ContentListPage() {
           <div className="section-label">
             {posts.length} post{posts.length === 1 ? "" : "s"}
           </div>
-          <button
-            onClick={createDraft}
-            disabled={creating}
-            className="px-3 py-1.5 rounded-md text-[12px] font-medium bg-primary text-primary-foreground hover:bg-primary-hover disabled:opacity-40"
-          >
-            {creating ? "Creating…" : "New post"}
-          </button>
+          <div className="flex items-center gap-2">
+            <TypefullySyncButton onDone={refresh} compact />
+            <button
+              onClick={createDraft}
+              disabled={creating}
+              className="px-3 py-1.5 rounded-md text-[12px] font-medium bg-primary text-primary-foreground hover:bg-primary-hover disabled:opacity-40"
+            >
+              {creating ? "Creating…" : "New post"}
+            </button>
+          </div>
         </div>
 
         {loading ? (

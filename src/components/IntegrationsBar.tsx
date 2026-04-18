@@ -61,18 +61,27 @@ export function IntegrationsBar() {
 
   const integrations = data.integrations || {};
 
-  // X uses Typefully today — when TYPEFULLY_API_KEY is set the user can
-  // actually push to X, so treat that as "connected" for the X card.
+  // LinkedIn and X both route through Typefully today. When
+  // TYPEFULLY_API_KEY is set the user can push to both, so treat
+  // that as "connected" for both cards.
+  const viaTypefully = !!integrations.typefully?.connected;
   const cards: PlatformCard[] = [
     {
       key: "linkedin",
       label: "LinkedIn",
-      subLabel: "Originals + TQG Page",
+      subLabel: viaTypefully
+        ? "Connected via Typefully"
+        : "Originals + TQG Page",
       color: "bg-sky-500",
-      connectVia: "LINKEDIN_ACCESS_TOKEN",
-      envVar: "LINKEDIN_ACCESS_TOKEN",
-      oauthFlow: "LinkedIn OAuth 2.0",
-      connected: !!integrations.linkedin?.connected,
+      connectVia: viaTypefully
+        ? "TYPEFULLY_API_KEY"
+        : "LINKEDIN_ACCESS_TOKEN",
+      envVar: viaTypefully
+        ? "TYPEFULLY_API_KEY"
+        : "LINKEDIN_ACCESS_TOKEN",
+      oauthFlow: viaTypefully ? "Typefully API" : "LinkedIn OAuth 2.0",
+      connected:
+        viaTypefully || !!integrations.linkedin?.connected,
     },
     {
       key: "x",

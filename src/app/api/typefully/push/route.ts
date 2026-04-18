@@ -113,19 +113,31 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Stamp first successful draft URL on the post for traceability.
+  // Stamp successful draft URLs + IDs on the post so the sync endpoint
+  // can match Typefully drafts back to our posts.
   if (body.post_id) {
-    const first = drafts.find((d) => d.available && d.shareUrl);
-    if (first) {
+    const successful = drafts.filter((d) => d.available && d.draftId);
+    if (successful.length > 0) {
       const db = getSupabaseServer();
       const { data: existing } = await db
         .from("posts")
         .select("performance")
         .eq("id", body.post_id)
         .maybeSingle();
+      const prevPerf =
+        (existing?.performance as Record<string, unknown>) || {};
+      const prevIds = Array.isArray(prevPerf.typefully_draft_ids)
+        ? (prevPerf.typefully_draft_ids as Array<string | number>)
+        : [];
+      const newIds = successful
+        .map((d) => d.draftId!)
+        .filter((id) => !prevIds.includes(id));
+      const firstWithUrl = successful.find((d) => d.shareUrl);
       const mergedPerf = {
-        ...((existing?.performance as Record<string, unknown>) || {}),
-        typefully_share_url: first.shareUrl,
+        ...prevPerf,
+        typefully_share_url:
+          firstWithUrl?.shareUrl || prevPerf.typefully_share_url || null,
+        typefully_draft_ids: [...prevIds, ...newIds],
       };
       await db
         .from("posts")

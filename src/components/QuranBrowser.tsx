@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { SurahPicker, useSurahs } from "@/components/SurahPicker";
+import { AyahTools } from "@/components/AyahTools";
 
 type Ayah = {
   verse_key: string;
@@ -34,6 +36,8 @@ export function QuranBrowser() {
   const [empty, setEmpty] = useState(false);
   const [quranImported, setQuranImported] = useState<boolean | null>(null);
   const [linkTarget, setLinkTarget] = useState<Ayah | null>(null);
+  const surahs = useSurahs();
+  const surahByNum = new Map(surahs.map((s) => [s.surah, s]));
   const debouncedQuery = useDebounced(query, 350);
 
   useEffect(() => {
@@ -135,17 +139,11 @@ export function QuranBrowser() {
             className="flex-1 bg-transparent border border-white/[0.08] rounded px-3 py-1.5 text-[13px] text-white/85 focus:outline-none focus:border-white/[0.2]"
           />
         ) : (
-          <select
+          <SurahPicker
             value={surah}
-            onChange={(e) => setSurah(Number(e.target.value))}
+            onChange={setSurah}
             className="flex-1 bg-white/[0.03] border border-white/[0.08] rounded px-3 py-1.5 text-[13px] text-white/85"
-          >
-            {Array.from({ length: 114 }, (_, i) => i + 1).map((n) => (
-              <option key={n} value={n}>
-                Surah {n}
-              </option>
-            ))}
-          </select>
+          />
         )}
       </div>
 
@@ -157,35 +155,46 @@ export function QuranBrowser() {
         </div>
       ) : (
         <ul className="space-y-2">
-          {results.map((a) => (
-            <li
-              key={a.verse_key}
-              className="p-3 rounded border border-white/[0.06] bg-white/[0.02]"
-            >
-              <div className="flex items-start justify-between gap-3 mb-2">
-                <span className="text-[11px] uppercase tracking-wider text-primary-bright">
-                  {a.verse_key}
-                </span>
-                <button
-                  onClick={() => setLinkTarget(a)}
-                  className="px-2 py-0.5 rounded text-[11px] border border-white/[0.08] text-white/75 hover:text-white hover:bg-white/[0.05]"
-                >
-                  Link to figure
-                </button>
-              </div>
-              <div
-                dir="rtl"
-                className="text-[14px] text-white/90 leading-relaxed mb-1"
+          {results.map((a) => {
+            const meta = surahByNum.get(a.surah);
+            return (
+              <li
+                key={a.verse_key}
+                className="p-3 rounded border border-white/[0.06] bg-white/[0.02]"
               >
-                {a.text_uthmani}
-              </div>
-              {a.translation_en ? (
-                <div className="text-[12px] text-white/60 leading-relaxed">
-                  {a.translation_en}
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div>
+                    <span className="text-[11px] uppercase tracking-wider text-primary-bright">
+                      {a.verse_key}
+                    </span>
+                    {meta ? (
+                      <span className="ml-2 text-[11px] text-white/55">
+                        {meta.name_transliteration} · {meta.name_english}
+                      </span>
+                    ) : null}
+                  </div>
+                  <button
+                    onClick={() => setLinkTarget(a)}
+                    className="px-2 py-0.5 rounded text-[11px] border border-white/[0.08] text-white/75 hover:text-white hover:bg-white/[0.05]"
+                  >
+                    Link to figure
+                  </button>
                 </div>
-              ) : null}
-            </li>
-          ))}
+                <div
+                  dir="rtl"
+                  className="text-[14px] text-white/90 leading-relaxed mb-1"
+                >
+                  {a.text_uthmani}
+                </div>
+                {a.translation_en ? (
+                  <div className="text-[12px] text-white/60 leading-relaxed mb-2">
+                    {a.translation_en}
+                  </div>
+                ) : null}
+                <AyahTools surah={a.surah} ayah={a.ayah} />
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -262,7 +271,7 @@ function LinkToFigureModal({
             <select
               value={selected}
               onChange={(e) => setSelected(e.target.value)}
-              className="mt-1 w-full bg-white/[0.03] border border-white/[0.08] rounded px-2 py-1.5 text-[13px] text-white/85"
+              className="mt-1 w-full bg-white/[0.03] border border-white/[0.08] rounded px-2 py-1.5 text-[13px] text-white/85 [&>option]:bg-zinc-900 [&>option]:text-white/85"
             >
               <option value="">— choose —</option>
               {(figures || []).map((f) => (

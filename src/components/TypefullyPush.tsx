@@ -16,6 +16,41 @@ type PushResp = {
 
 type Schedule = "draft" | "next-free-slot" | "custom";
 
+const SUGGESTED_SLOTS: Record<string, Array<{ label: string; dayOffset: number; hour: number; minute: number }>> = {
+  linkedin: [
+    { label: "Tue 08:00 BST (best)", dayOffset: 2, hour: 8, minute: 0 },
+    { label: "Wed 08:30 BST", dayOffset: 3, hour: 8, minute: 30 },
+    { label: "Thu 09:00 BST", dayOffset: 4, hour: 9, minute: 0 },
+  ],
+  x: [
+    { label: "Today 12:00 BST", dayOffset: 0, hour: 12, minute: 0 },
+    { label: "Tomorrow 12:00 BST", dayOffset: 1, hour: 12, minute: 0 },
+  ],
+  instagram: [
+    { label: "Today 19:00 BST", dayOffset: 0, hour: 19, minute: 0 },
+    { label: "Tomorrow 11:00 BST", dayOffset: 1, hour: 11, minute: 0 },
+  ],
+  facebook: [{ label: "Tomorrow 13:00 BST", dayOffset: 1, hour: 13, minute: 0 }],
+};
+
+function formatLocalDateTime(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours()
+  )}:${pad(d.getMinutes())}`;
+}
+
+function nextSlot(dayOffset: number, hour: number, minute: number): Date {
+  const now = new Date();
+  const target = new Date(now);
+  target.setDate(now.getDate() + dayOffset);
+  target.setHours(hour, minute, 0, 0);
+  if (target.getTime() <= now.getTime()) {
+    target.setDate(target.getDate() + 7);
+  }
+  return target;
+}
+
 export function TypefullyPush({
   postId,
   content,
@@ -126,6 +161,30 @@ export function TypefullyPush({
           />
         ) : null}
         <div className="flex-1" />
+      </div>
+
+      {(SUGGESTED_SLOTS[platform] || []).length > 0 ? (
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px] text-white/50">
+          <span className="uppercase tracking-wider">Best times</span>
+          {(SUGGESTED_SLOTS[platform] || []).map((s) => (
+            <button
+              key={s.label}
+              type="button"
+              onClick={() => {
+                setSchedule("custom");
+                setCustomDate(
+                  formatLocalDateTime(nextSlot(s.dayOffset, s.hour, s.minute))
+                );
+              }}
+              className="px-2 py-0.5 rounded border border-white/[0.08] text-white/70 hover:text-white hover:bg-white/[0.04]"
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap items-center gap-2 mb-3 text-[12px]">
         <button
           onClick={() => doPush("single")}
           disabled={pushing}
