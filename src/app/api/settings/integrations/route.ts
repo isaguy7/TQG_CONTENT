@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { listConnections } from "@/lib/oauth-connections";
+import { getCurrentUser } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,8 +18,27 @@ export async function GET() {
       hasEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"));
   const typefullyConnected = hasEnv("TYPEFULLY_API_KEY");
   const unsplashConnected = hasEnv("UNSPLASH_ACCESS_KEY");
-  const linkedinConnected = hasEnv("LINKEDIN_ACCESS_TOKEN");
   const metaConnected = hasEnv("META_ACCESS_TOKEN");
+
+  // Per-user OAuth state lives in oauth_connections; resolve the current
+  // user (if any) and look up LinkedIn / X connection rows.
+  const user = await getCurrentUser();
+  const conns = user ? await listConnections(user.id) : [];
+  const now = Date.now();
+  const findConn = (platform: "linkedin" | "x") => {
+    const c = conns.find((x) => x.platform === platform);
+    if (!c) return null;
+    const expired = c.token_expires_at
+      ? new Date(c.token_expires_at).getTime() <= now
+      : false;
+    return {
+      account_name: c.account_name,
+      status: expired && c.status === "active" ? "expired" : c.status,
+      token_expires_at: c.token_expires_at,
+    };
+  };
+  const linkedinConn = findConn("linkedin");
+  const xConn = findConn("x");
 
   const integrations = {
     supabase: {
@@ -40,8 +61,12 @@ export async function GET() {
       connected: hasEnv("PEXELS_API_KEY"),
     },
     linkedin: {
-      connected: linkedinConnected,
-      oauth_ready: false,
+      connected: !!linkedinConn && linkedinConn.status === "active",
+      oauth: linkedinConn,
+    },
+    x: {
+      connected: !!xConn && xConn.status === "active",
+      oauth: xConn,
     },
     meta: {
       connected: metaConnected,
@@ -53,18 +78,6 @@ export async function GET() {
       batchSize: Number(process.env.WHISPERX_BATCH_SIZE) || 4,
     },
   };
-
-  // Helpful server-side log so the user can confirm which keys are detected.
-  if (process.env.NODE_ENV !== "production") {
-    console.log("[integrations] status:", {
-      supabase: supabaseConnected,
-      anthropic: anthropicConnected,
-      typefully: typefullyConnected,
-      unsplash: unsplashConnected,
-      linkedin: linkedinConnected,
-      meta: metaConnected,
-    });
-  }
 
   return NextResponse.json({ integrations });
 }

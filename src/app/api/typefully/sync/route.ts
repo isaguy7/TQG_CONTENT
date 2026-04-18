@@ -6,6 +6,7 @@ import {
   type TypefullyDraft,
 } from "@/lib/typefully";
 import { getSupabaseServer } from "@/lib/supabase";
+import { requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +33,9 @@ type ExtendedDraft = TypefullyDraft & {
  * Only creates a new post when no existing match is found.
  */
 export async function POST() {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
   if (!typefullyAvailable()) {
     return NextResponse.json(
       { available: false, reason: "TYPEFULLY_API_KEY missing" },
@@ -51,6 +55,7 @@ export async function POST() {
   const { data: existingPosts } = await db
     .from("posts")
     .select("id,title,final_content,status,platform,performance,published_at")
+    .eq("user_id", auth.user.id)
     .is("deleted_at", null);
 
   const rows = (existingPosts || []) as Array<{
@@ -133,7 +138,11 @@ export async function POST() {
         (patch.performance as Record<string, unknown>).typefully_share_url =
           draft.share_url;
       }
-      await db.from("posts").update(patch).eq("id", match.id);
+      await db
+        .from("posts")
+        .update(patch)
+        .eq("id", match.id)
+        .eq("user_id", auth.user.id);
       updated += 1;
     } else {
       if (!text.trim()) {
@@ -147,6 +156,7 @@ export async function POST() {
         status: "published",
         final_content: text,
         published_at: publishedAt,
+        user_id: auth.user.id,
         performance: {
           typefully_draft_ids: [draft.id],
           typefully_share_url: draft.share_url || null,
@@ -169,7 +179,11 @@ export async function POST() {
       patch.status = "scheduled";
     }
     if (draft.scheduled_date) patch.scheduled_for = draft.scheduled_date;
-    await db.from("posts").update(patch).eq("id", match.id);
+    await db
+      .from("posts")
+      .update(patch)
+      .eq("id", match.id)
+      .eq("user_id", auth.user.id);
     updated += 1;
   }
 

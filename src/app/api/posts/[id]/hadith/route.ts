@@ -1,11 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase";
 import { isUuid } from "@/lib/utils";
+import { requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type Params = { params: { id: string } };
+
+async function ownsPost(
+  db: ReturnType<typeof getSupabaseServer>,
+  postId: string,
+  userId: string
+): Promise<boolean> {
+  const { data } = await db
+    .from("posts")
+    .select("id")
+    .eq("id", postId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  return !!data;
+}
 
 /**
  * POST /api/posts/[id]/hadith — attach a hadith_verifications row to
@@ -15,6 +30,9 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!isUuid(params.id)) {
     return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
   }
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
   let body: { hadith_id?: string };
   try {
     body = await req.json();
@@ -29,6 +47,9 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   const db = getSupabaseServer();
+  if (!(await ownsPost(db, params.id, auth.user.id))) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   const { count } = await db
     .from("post_hadith_refs")
@@ -54,6 +75,9 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (!isUuid(params.id)) {
     return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
   }
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
   const hadithId = req.nextUrl.searchParams.get("hadith_id");
   if (!hadithId || !isUuid(hadithId)) {
     return NextResponse.json(
@@ -63,6 +87,10 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   }
 
   const db = getSupabaseServer();
+  if (!(await ownsPost(db, params.id, auth.user.id))) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const { error } = await db
     .from("post_hadith_refs")
     .delete()

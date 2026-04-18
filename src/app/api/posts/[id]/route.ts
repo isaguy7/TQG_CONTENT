@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase";
 import { recordPublished } from "@/lib/gap-alerts";
 import { isUuid } from "@/lib/utils";
+import { requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,11 +13,15 @@ export async function GET(_req: NextRequest, { params }: Params) {
   if (!isUuid(params.id)) {
     return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
   }
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
   const db = getSupabaseServer();
   const { data: post, error } = await db
     .from("posts")
     .select("*")
     .eq("id", params.id)
+    .eq("user_id", auth.user.id)
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 404 });
 
@@ -48,6 +53,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!isUuid(params.id)) {
     return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
   }
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
   let body: {
     title?: string;
     final_content?: string | null;
@@ -101,6 +109,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     .from("posts")
     .update(update)
     .eq("id", params.id)
+    .eq("user_id", auth.user.id)
     .select()
     .single();
 
@@ -128,10 +137,17 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (!isUuid(params.id)) {
     return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
   }
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
   const db = getSupabaseServer();
   const permanent = req.nextUrl.searchParams.get("permanent") === "true";
   if (permanent) {
-    const { error } = await db.from("posts").delete().eq("id", params.id);
+    const { error } = await db
+      .from("posts")
+      .delete()
+      .eq("id", params.id)
+      .eq("user_id", auth.user.id);
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -141,6 +157,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     .from("posts")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", params.id)
+    .eq("user_id", auth.user.id)
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

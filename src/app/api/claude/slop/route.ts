@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkSlop } from "@/lib/claude-api";
+import { requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
   let body: { content?: string; post_id?: string } = {};
   try {
     body = await req.json();
@@ -18,6 +22,7 @@ export async function POST(req: NextRequest) {
     const result = await checkSlop({
       content: body.content,
       postId: body.post_id || null,
+      userId: auth.user.id,
     });
     return NextResponse.json(result);
   } catch (err) {

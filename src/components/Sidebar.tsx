@@ -1,10 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { TypefullyAutoSync } from "@/components/TypefullyAutoSync";
+
+type Me = {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  avatar_url: string | null;
+  provider: string | null;
+};
 
 const nav = [
   { href: "/", label: "Dashboard" },
@@ -54,7 +62,10 @@ const statusLabel: Record<PostStatus, string> = {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [recent, setRecent] = useState<RecentPost[] | null>(null);
+  const [me, setMe] = useState<Me | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
 
   const load = () => {
     fetch("/api/posts?limit=5")
@@ -68,14 +79,23 @@ export function Sidebar() {
 
   useEffect(() => {
     load();
-    // Re-fetch when the user navigates back to the app so the sidebar reflects
-    // new drafts created in other tabs / Typefully syncs.
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { user: null }))
+      .then((j) => setMe(j.user || null))
+      .catch(() => setMe(null));
     const onFocus = () => load();
     window.addEventListener("focus", onFocus);
     return () => {
       window.removeEventListener("focus", onFocus);
     };
   }, [pathname]);
+
+  const signOut = async () => {
+    setSigningOut(true);
+    await fetch("/api/auth/signout", { method: "POST" }).catch(() => {});
+    router.push("/login");
+    router.refresh();
+  };
 
   return (
     <aside className="w-48 shrink-0 bg-sidebar border-r border-white/[0.06] flex flex-col">
@@ -185,9 +205,42 @@ export function Sidebar() {
         )}
       </div>
 
-      <div className="px-4 py-2 border-t border-white/[0.06] text-[10px] text-white/30">
-        v0.5 · polish + flow
-      </div>
+      {me ? (
+        <div className="px-3 py-3 border-t border-white/[0.06] flex items-center gap-2">
+          {me.avatar_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={me.avatar_url}
+              alt=""
+              className="w-7 h-7 rounded-full object-cover bg-white/[0.05]"
+            />
+          ) : (
+            <div className="w-7 h-7 rounded-full bg-white/[0.06] text-[10px] flex items-center justify-center text-white/60">
+              {(me.full_name || me.email || "?").slice(0, 1).toUpperCase()}
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="text-[12px] text-white/85 truncate">
+              {me.full_name || me.email}
+            </div>
+            <div className="text-[10px] text-white/35 truncate">
+              {me.provider || "signed in"}
+            </div>
+          </div>
+          <button
+            onClick={signOut}
+            disabled={signingOut}
+            className="text-[10px] text-white/40 hover:text-white/85 disabled:opacity-40"
+            title="Sign out"
+          >
+            {signingOut ? "…" : "Sign out"}
+          </button>
+        </div>
+      ) : (
+        <div className="px-4 py-2 border-t border-white/[0.06] text-[10px] text-white/30">
+          v0.5 · polish + flow
+        </div>
+      )}
     </aside>
   );
 }

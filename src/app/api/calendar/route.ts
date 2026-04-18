@@ -6,6 +6,7 @@ import {
   typefullyAvailable,
   type TypefullyDraft,
 } from "@/lib/typefully";
+import { requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,11 +19,14 @@ type ExtendedDraft = TypefullyDraft & {
 };
 
 export async function GET(req: NextRequest) {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
   const sp = req.nextUrl.searchParams;
   const monthParam = sp.get("month"); // format: YYYY-MM; default = current month
 
-  const calendar = await ensureCurrentWeek();
-  const alerts = await computeGapAlerts();
+  const calendar = await ensureCurrentWeek(auth.user.id);
+  const alerts = await computeGapAlerts(auth.user.id);
 
   const db = getSupabaseServer();
 
@@ -46,6 +50,7 @@ export async function GET(req: NextRequest) {
     .select(
       "id,title,platform,status,scheduled_for,published_at,figure_id,labels,performance"
     )
+    .eq("user_id", auth.user.id)
     .is("deleted_at", null)
     .or(
       `and(status.eq.published,published_at.gte.${monthStart.toISOString()},published_at.lt.${monthEnd.toISOString()}),and(status.in.(scheduled,ready,drafting,idea,review),scheduled_for.gte.${monthStart.toISOString()},scheduled_for.lt.${monthEnd.toISOString()})`

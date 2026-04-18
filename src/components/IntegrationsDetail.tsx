@@ -1,7 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase-browser";
 import { cn } from "@/lib/utils";
+
+type OAuthState = {
+  account_name: string | null;
+  status: "active" | "expired" | "revoked";
+  token_expires_at: string | null;
+};
 
 type IntegrationsPayload = {
   integrations: {
@@ -10,7 +17,8 @@ type IntegrationsPayload = {
     typefully?: { connected: boolean; social_set?: boolean };
     unsplash?: { connected: boolean };
     pexels?: { connected: boolean };
-    linkedin?: { connected: boolean; oauth_ready?: boolean };
+    linkedin?: { connected: boolean; oauth?: OAuthState | null };
+    x?: { connected: boolean; oauth?: OAuthState | null };
     meta?: { connected: boolean; oauth_ready?: boolean };
     whisperx?: { model: string; device: string; batchSize: number };
   };
@@ -24,23 +32,42 @@ type EnvPayload = {
   mode: "cloud" | "local";
 };
 
+function formatExpiry(iso: string | null): string {
+  if (!iso) return "—";
+  const ms = new Date(iso).getTime() - Date.now();
+  if (ms <= 0) return "expired";
+  const days = Math.round(ms / (24 * 3600 * 1000));
+  if (days >= 1) return `${days}d`;
+  const hours = Math.round(ms / (3600 * 1000));
+  return `${hours}h`;
+}
+
 function Row({
   label,
   connected,
+  status,
   details,
   envVar,
+  action,
 }: {
   label: string;
   connected: boolean;
+  status?: OAuthState["status"];
   details?: Array<[string, string]>;
   envVar?: string;
+  action?: React.ReactNode;
 }) {
+  const expired = status === "expired";
   return (
     <div className="flex items-start gap-4 py-3 border-b border-white/[0.05] last:border-b-0">
       <span
         className={cn(
           "shrink-0 mt-1.5 w-2 h-2 rounded-full",
-          connected ? "bg-emerald-400" : "bg-white/25"
+          expired
+            ? "bg-amber-400"
+            : connected
+              ? "bg-emerald-400"
+              : "bg-white/25"
         )}
       />
       <div className="flex-1 min-w-0">
@@ -49,10 +76,18 @@ function Row({
           <span
             className={cn(
               "text-[11px] shrink-0",
-              connected ? "text-emerald-300" : "text-white/45"
+              expired
+                ? "text-amber-300"
+                : connected
+                  ? "text-emerald-300"
+                  : "text-white/45"
             )}
           >
-            {connected ? "Connected" : "Not connected"}
+            {expired
+              ? "Reconnect needed"
+              : connected
+                ? "Connected"
+                : "Not connected"}
           </span>
         </div>
         {details && details.length > 0 ? (
@@ -70,6 +105,7 @@ function Row({
             {envVar}
           </div>
         ) : null}
+        {action ? <div className="mt-2">{action}</div> : null}
       </div>
     </div>
   );
@@ -78,8 +114,9 @@ function Row({
 export function IntegrationsDetail() {
   const [data, setData] = useState<IntegrationsPayload | null>(null);
   const [env, setEnv] = useState<EnvPayload | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     fetch("/api/settings/integrations", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then(setData)
@@ -90,12 +127,82 @@ export function IntegrationsDetail() {
       .catch(() => setEnv(null));
   }, []);
 
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const reconnect = async (provider: "linkedin_oidc" | "twitter") => {
+    setBusy(provider);
+    const supabase = createClient();
+    const scopes =
+      provider === "linkedin_oidc"
+        ? "openid profile email w_member_social"
+        : "tweet.read tweet.write users.read offline.access";
+    await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/settings")}`,
+        scopes,
+      },
+    });
+    setBusy(null);
+  };
+
+  const disconnect = async (platform: "linkedin" | "x") => {
+    setBusy(platform);
+    await fetch(`/api/auth/connections?platform=${platform}`, {
+      method: "DELETE",
+    });
+    setBusy(null);
+    load();
+  };
+
   if (!data) {
     return (
       <div className="text-[12px] text-white/45">Loading integrations…</div>
     );
   }
   const i = data.integrations;
+
+  const linkedinAction = i.linkedin?.connected ? (
+    <button
+      onClick={() => disconnect("linkedin")}
+      disabled={busy !== null}
+      className="px-2.5 py-1 rounded text-[11px] border border-white/[0.08] text-white/70 hover:text-white hover:bg-white/[0.04] disabled:opacity-40"
+    >
+      Disconnect
+    </button>
+  ) : (
+    <button
+      onClick={() => reconnect("linkedin_oidc")}
+      disabled={busy !== null}
+      className="px-2.5 py-1 rounded text-[11px] bg-[#0A66C2] text-white hover:bg-[#004182] disabled:opacity-40"
+    >
+      {i.linkedin?.oauth?.status === "expired"
+        ? "Reconnect LinkedIn"
+        : "Sign in with LinkedIn"}
+    </button>
+  );
+
+  const xAction = i.x?.connected ? (
+    <button
+      onClick={() => disconnect("x")}
+      disabled={busy !== null}
+      className="px-2.5 py-1 rounded text-[11px] border border-white/[0.08] text-white/70 hover:text-white hover:bg-white/[0.04] disabled:opacity-40"
+    >
+      Disconnect
+    </button>
+  ) : (
+    <button
+      onClick={() => reconnect("twitter")}
+      disabled={busy !== null}
+      className="px-2.5 py-1 rounded text-[11px] bg-black border border-white/[0.15] text-white hover:bg-white/[0.05] disabled:opacity-40"
+    >
+      {i.x?.oauth?.status === "expired"
+        ? "Reconnect X"
+        : "Sign in with X"}
+    </button>
+  );
 
   return (
     <div>
@@ -123,7 +230,35 @@ export function IntegrationsDetail() {
         }
       />
       <Row
-        label="Typefully (LinkedIn + X)"
+        label="LinkedIn (direct posting)"
+        connected={!!i.linkedin?.connected}
+        status={i.linkedin?.oauth?.status}
+        details={
+          i.linkedin?.oauth
+            ? [
+                ["Account", i.linkedin.oauth.account_name || "—"],
+                ["Token", formatExpiry(i.linkedin.oauth.token_expires_at)],
+              ]
+            : undefined
+        }
+        action={linkedinAction}
+      />
+      <Row
+        label="X (direct posting)"
+        connected={!!i.x?.connected}
+        status={i.x?.oauth?.status}
+        details={
+          i.x?.oauth
+            ? [
+                ["Account", i.x.oauth.account_name || "—"],
+                ["Token", formatExpiry(i.x.oauth.token_expires_at)],
+              ]
+            : undefined
+        }
+        action={xAction}
+      />
+      <Row
+        label="Typefully (fallback scheduler)"
         connected={!!i.typefully?.connected}
         envVar="TYPEFULLY_API_KEY · TYPEFULLY_SOCIAL_SET_ID"
         details={
@@ -147,16 +282,6 @@ export function IntegrationsDetail() {
         connected={!!i.pexels?.connected}
         envVar="PEXELS_API_KEY"
       />
-      {!i.typefully?.connected ? (
-        <Row
-          label="LinkedIn"
-          connected={!!i.linkedin?.connected}
-          envVar="LINKEDIN_ACCESS_TOKEN"
-          details={[
-            ["OAuth ready", i.linkedin?.oauth_ready ? "yes" : "no"],
-          ]}
-        />
-      ) : null}
       <Row
         label="Meta (Instagram / Facebook)"
         connected={!!i.meta?.connected}
@@ -169,12 +294,7 @@ export function IntegrationsDetail() {
           connected={env ? !env.hosted : true}
           details={
             env?.hosted
-              ? [
-                  [
-                    "Runtime",
-                    "hosted — local GPU required, skipped",
-                  ],
-                ]
+              ? [["Runtime", "hosted — local GPU required, skipped"]]
               : [
                   ["Model", i.whisperx.model],
                   ["Device", i.whisperx.device],
