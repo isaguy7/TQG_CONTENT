@@ -111,7 +111,11 @@ function Row({
   );
 }
 
-export function IntegrationsDetail() {
+export function IntegrationsDetail({
+  mode = "all",
+}: {
+  mode?: "all" | "accounts" | "services";
+} = {}) {
   const [data, setData] = useState<IntegrationsPayload | null>(null);
   const [env, setEnv] = useState<EnvPayload | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -131,20 +135,31 @@ export function IntegrationsDetail() {
     load();
   }, [load]);
 
-  const reconnect = async (provider: "linkedin_oidc" | "twitter") => {
+  const [providerError, setProviderError] = useState<string | null>(null);
+
+  const reconnect = async (provider: "linkedin_oidc" | "x") => {
     setBusy(provider);
+    setProviderError(null);
     const supabase = createClient();
     const scopes =
       provider === "linkedin_oidc"
         ? "openid profile email w_member_social"
         : "tweet.read tweet.write users.read offline.access";
-    await supabase.auth.signInWithOAuth({
-      provider,
+    const { error } = await supabase.auth.signInWithOAuth({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      provider: provider as any,
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/settings")}`,
         scopes,
       },
     });
+    if (error) {
+      const label = provider === "linkedin_oidc" ? "LinkedIn" : "X";
+      const msg = /not enabled|provider/i.test(error.message)
+        ? `${label} sign-in isn't available yet. Ask the admin to enable the provider in Supabase.`
+        : error.message;
+      setProviderError(msg);
+    }
     setBusy(null);
   };
 
@@ -194,7 +209,7 @@ export function IntegrationsDetail() {
     </button>
   ) : (
     <button
-      onClick={() => reconnect("twitter")}
+      onClick={() => reconnect("x")}
       disabled={busy !== null}
       className="px-2.5 py-1 rounded text-[11px] bg-black border border-white/[0.15] text-white hover:bg-white/[0.05] disabled:opacity-40"
     >
@@ -204,59 +219,77 @@ export function IntegrationsDetail() {
     </button>
   );
 
+  const showAccounts = mode === "all" || mode === "accounts";
+  const showServices = mode === "all" || mode === "services";
+
   return (
     <div>
-      <Row
-        label="Supabase"
-        connected={!!i.supabase?.connected}
-        envVar="NEXT_PUBLIC_SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY"
-        details={
-          i.supabase?.connected
-            ? [
-                ["URL", i.supabase.url || "—"],
-                ["Service role", i.supabase.service_role ? "yes" : "no"],
-              ]
-            : undefined
-        }
-      />
-      <Row
-        label="Anthropic (Claude)"
-        connected={!!i.anthropic?.connected}
-        envVar="ANTHROPIC_API_KEY"
-        details={
-          i.anthropic?.connected
-            ? [["Model", i.anthropic.model || "—"]]
-            : undefined
-        }
-      />
-      <Row
-        label="LinkedIn (direct posting)"
-        connected={!!i.linkedin?.connected}
-        status={i.linkedin?.oauth?.status}
-        details={
-          i.linkedin?.oauth
-            ? [
-                ["Account", i.linkedin.oauth.account_name || "—"],
-                ["Token", formatExpiry(i.linkedin.oauth.token_expires_at)],
-              ]
-            : undefined
-        }
-        action={linkedinAction}
-      />
-      <Row
-        label="X (direct posting)"
-        connected={!!i.x?.connected}
-        status={i.x?.oauth?.status}
-        details={
-          i.x?.oauth
-            ? [
-                ["Account", i.x.oauth.account_name || "—"],
-                ["Token", formatExpiry(i.x.oauth.token_expires_at)],
-              ]
-            : undefined
-        }
-        action={xAction}
-      />
+      {providerError && showAccounts ? (
+        <div className="mb-3 rounded-md border border-amber-400/30 bg-amber-500/10 p-2 text-[12px] text-amber-100/90">
+          {providerError}
+        </div>
+      ) : null}
+      {showServices ? (
+        <>
+          <Row
+            label="Supabase"
+            connected={!!i.supabase?.connected}
+            envVar="NEXT_PUBLIC_SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY"
+            details={
+              i.supabase?.connected
+                ? [
+                    ["URL", i.supabase.url || "—"],
+                    ["Service role", i.supabase.service_role ? "yes" : "no"],
+                  ]
+                : undefined
+            }
+          />
+          <Row
+            label="Anthropic (Claude)"
+            connected={!!i.anthropic?.connected}
+            envVar="ANTHROPIC_API_KEY"
+            details={
+              i.anthropic?.connected
+                ? [["Model", i.anthropic.model || "—"]]
+                : undefined
+            }
+          />
+        </>
+      ) : null}
+      {showAccounts ? (
+        <>
+          <Row
+            label="LinkedIn (direct posting)"
+            connected={!!i.linkedin?.connected}
+            status={i.linkedin?.oauth?.status}
+            details={
+              i.linkedin?.oauth
+                ? [
+                    ["Account", i.linkedin.oauth.account_name || "—"],
+                    ["Token", formatExpiry(i.linkedin.oauth.token_expires_at)],
+                  ]
+                : undefined
+            }
+            action={linkedinAction}
+          />
+          <Row
+            label="X (direct posting)"
+            connected={!!i.x?.connected}
+            status={i.x?.oauth?.status}
+            details={
+              i.x?.oauth
+                ? [
+                    ["Account", i.x.oauth.account_name || "—"],
+                    ["Token", formatExpiry(i.x.oauth.token_expires_at)],
+                  ]
+                : undefined
+            }
+            action={xAction}
+          />
+        </>
+      ) : null}
+      {showServices ? (
+        <>
       <Row
         label="Typefully (fallback scheduler)"
         connected={!!i.typefully?.connected}
@@ -328,6 +361,8 @@ export function IntegrationsDetail() {
             connected={env.gpu}
             details={[["Mode", env.mode]]}
           />
+        </>
+      ) : null}
         </>
       ) : null}
     </div>

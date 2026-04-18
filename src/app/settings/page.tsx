@@ -11,6 +11,15 @@ export default function SettingsPage() {
     >
       <div className="space-y-4 max-w-2xl">
         <section className="rounded-lg border border-border bg-surface p-6">
+          <h2 className="text-sm font-semibold mb-3">Connect your accounts</h2>
+          <p className="text-[12px] text-muted-foreground mb-4">
+            Sign in with LinkedIn and X so TQG Studio can post on your behalf.
+            These connections are separate from your app login.
+          </p>
+          <IntegrationsDetail mode="accounts" />
+        </section>
+
+        <section className="rounded-lg border border-border bg-surface p-6">
           <h2 className="text-sm font-semibold mb-3">Integrations</h2>
           <p className="text-[12px] text-muted-foreground mb-4">
             Source of truth for connection status — shared with the Dashboard.
@@ -18,7 +27,7 @@ export default function SettingsPage() {
             (see <code className="font-mono text-xs">.env.local.example</code>)
             and restart the dev server.
           </p>
-          <IntegrationsDetail />
+          <IntegrationsDetail mode="services" />
         </section>
 
         <section className="rounded-lg border border-border bg-surface p-6">

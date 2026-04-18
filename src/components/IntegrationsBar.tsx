@@ -39,7 +39,7 @@ type PlatformCard = {
   color: string;
   connected: boolean;
   status?: OAuthState["status"];
-  oauthProvider?: "linkedin_oidc" | "twitter";
+  oauthProvider?: "linkedin_oidc" | "x";
   scopes?: string;
   helper?: string;
 };
@@ -93,7 +93,7 @@ export function IntegrationsBar() {
       color: "bg-white",
       connected: !!x?.connected,
       status: x?.oauth?.status,
-      oauthProvider: "twitter",
+      oauthProvider: "x",
       scopes: "tweet.read tweet.write users.read offline.access",
     },
     {
@@ -200,14 +200,18 @@ function ConnectModal({
     try {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: platform.oauthProvider,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        provider: platform.oauthProvider as any,
         options: {
           redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/settings")}`,
           scopes: platform.scopes,
         },
       });
       if (error) {
-        setErr(error.message);
+        const msg = /not enabled|provider/i.test(error.message)
+          ? `${platform.label} sign-in isn't available yet. Ask the admin to enable the provider in Supabase.`
+          : error.message;
+        setErr(msg);
         setBusy(false);
       }
     } catch (e) {
