@@ -164,9 +164,11 @@ export async function POST(req: NextRequest) {
 
           if (hosted) {
             // Vercel path — HTTP-only YouTube captions.
+            const videoId = extractYoutubeVideoId(url);
             console.log(
-              `[transcribe] hosted path videoId=${extractYoutubeVideoId(url)} url=${url}`
+              `[transcribe] entering hosted path videoId=${videoId} url=${url}`
             );
+            const t0 = Date.now();
             try {
               const httpCaps = await fetchYoutubeCaptionsHttp(url, "en", signal);
               captions = httpCaps;
@@ -176,12 +178,15 @@ export async function POST(req: NextRequest) {
                 channel: httpCaps.channel,
               };
               console.log(
-                `[transcribe] hosted captions ok: ${httpCaps.source} ${httpCaps.segments.length} segs`
+                `[transcribe] hosted captions ok in ${Date.now() - t0}ms: ` +
+                  `source=${httpCaps.source} segments=${httpCaps.segments.length} ` +
+                  `language=${httpCaps.language} title="${httpCaps.title ?? ""}"`
               );
             } catch (err) {
               if (err instanceof CaptionsHttpError) {
                 console.error(
-                  `[transcribe] hosted captions failed reason=${err.reason} msg=${err.message}`
+                  `[transcribe] hosted captions failed in ${Date.now() - t0}ms ` +
+                    `reason=${err.reason} msg=${err.message}`
                 );
                 send({
                   phase: "error",
@@ -189,6 +194,10 @@ export async function POST(req: NextRequest) {
                 });
                 return;
               }
+              console.error(
+                `[transcribe] hosted captions threw unexpected error after ${Date.now() - t0}ms`,
+                err
+              );
               throw err;
             }
           } else {

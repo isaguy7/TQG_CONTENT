@@ -25,20 +25,31 @@ export async function GET() {
   const user = await getCurrentUser();
   const conns = user ? await listConnections(user.id) : [];
   const now = Date.now();
-  const findConn = (platform: "linkedin" | "x") => {
-    const c = conns.find((x) => x.platform === platform);
+  const findPersonal = (platform: "linkedin" | "x") => {
+    const c = conns.find(
+      (x) => x.platform === platform && x.account_type === "personal"
+    );
     if (!c) return null;
     const expired = c.token_expires_at
       ? new Date(c.token_expires_at).getTime() <= now
       : false;
     return {
       account_name: c.account_name,
+      account_type: c.account_type,
       status: expired && c.status === "active" ? "expired" : c.status,
       token_expires_at: c.token_expires_at,
     };
   };
-  const linkedinConn = findConn("linkedin");
-  const xConn = findConn("x");
+  const linkedinConn = findPersonal("linkedin");
+  const xConn = findPersonal("x");
+  const linkedinOrgs = conns
+    .filter((c) => c.platform === "linkedin" && c.account_type === "organization")
+    .map((c) => ({
+      id: c.id,
+      account_id: c.account_id,
+      account_name: c.account_name,
+      status: c.status,
+    }));
 
   const integrations = {
     supabase: {
@@ -63,6 +74,7 @@ export async function GET() {
     linkedin: {
       connected: !!linkedinConn && linkedinConn.status === "active",
       oauth: linkedinConn,
+      organizations: linkedinOrgs,
     },
     x: {
       connected: !!xConn && xConn.status === "active",

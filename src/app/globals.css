@@ -61,7 +61,31 @@
 
 @layer components {
   .section-label {
-    @apply text-[10px] uppercase tracking-[0.08em] text-white/30 font-medium;
+    @apply text-[11px] uppercase tracking-[0.08em] text-white/45 font-semibold;
+  }
+
+  /* Reusable glass-style card surface. Slightly brighter border than the
+     default `*` border (which is rgba(255,255,255,0.06)) so cards have a
+     readable perimeter without feeling heavy. */
+  .card-surface {
+    @apply rounded-xl bg-white/[0.03] border border-white/[0.06]
+           shadow-lg shadow-black/10;
+  }
+
+  /* Paired with card-surface on clickable elements. The -translate-y-0.5
+     lift is intentionally small — it's there to hint the row is tappable
+     without making a big visual commotion on every hover. */
+  .card-interactive {
+    @apply transition-all duration-200
+           hover:bg-white/[0.05] hover:border-white/[0.12]
+           hover:shadow-xl hover:shadow-black/20
+           hover:-translate-y-0.5;
+  }
+
+  /* Thin divider line between major page sections. Kept separate from
+     the Tailwind border utilities so pages can opt in consistently. */
+  .section-divider {
+    @apply my-6 border-t border-white/[0.05];
   }
 }
 

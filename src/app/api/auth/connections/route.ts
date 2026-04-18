@@ -3,8 +3,10 @@ import { requireUser } from "@/lib/auth";
 import {
   listConnections,
   revokeConnection,
+  revokeConnectionById,
   type OAuthPlatform,
 } from "@/lib/oauth-connections";
+import { getSupabaseServer } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +24,9 @@ export async function GET() {
         ? new Date(c.token_expires_at).getTime() <= now
         : false;
       return {
+        id: c.id,
         platform: c.platform,
+        account_type: c.account_type,
         account_name: c.account_name,
         account_id: c.account_id,
         status: expired && c.status === "active" ? "expired" : c.status,
@@ -41,6 +45,27 @@ export async function DELETE(req: NextRequest) {
   if ("response" in auth) return auth.response;
 
   const platform = req.nextUrl.searchParams.get("platform");
+  const connectionId = req.nextUrl.searchParams.get("id");
+
+  // If the caller passes ?id=… we only drop that one row — used to
+  // disconnect a single LinkedIn Page without killing the personal login.
+  if (connectionId) {
+    const db = getSupabaseServer();
+    const { data } = await db
+      .from("oauth_connections")
+      .select("id,user_id")
+      .eq("id", connectionId)
+      .maybeSingle();
+    if (!data || data.user_id !== auth.user.id) {
+      return NextResponse.json(
+        { error: "Connection not found" },
+        { status: 404 }
+      );
+    }
+    await revokeConnectionById(connectionId);
+    return NextResponse.json({ ok: true });
+  }
+
   if (platform !== "linkedin" && platform !== "x") {
     return NextResponse.json(
       { error: "Missing or invalid 'platform'" },

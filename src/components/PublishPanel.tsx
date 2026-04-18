@@ -7,7 +7,9 @@ import { TypefullyPush } from "@/components/TypefullyPush";
 type Platform = "linkedin" | "x";
 
 type Connection = {
+  id: string;
   platform: string;
+  account_type: "personal" | "organization";
   account_name: string | null;
   account_id: string;
   status: "active" | "expired" | "revoked";
@@ -70,6 +72,12 @@ export function PublishPanel({
     linkedin: true,
     x: false,
   });
+  // Which LinkedIn author to post as — the connection row id. Null = post
+  // as personal (the default). For orgs, stores the connection row id so
+  // we can look up account_id (the org URN number) at publish time.
+  const [linkedinAuthorConnId, setLinkedinAuthorConnId] = useState<string | null>(
+    null
+  );
   const [variants, setVariants] = useState<ConvertedVariant[]>([
     { platform: "linkedin", content },
     { platform: "x", content },
@@ -98,15 +106,41 @@ export function PublishPanel({
     );
   }, [content]);
 
+  // The publish panel shows ONE row per platform — pick the personal
+  // connection as the representative ("are we connected at all?"). Org
+  // rows appear as extra options in the LinkedIn author dropdown below.
   const connByPlatform = useMemo(() => {
     const map: Partial<Record<Platform, Connection>> = {};
     for (const c of conns || []) {
-      if (c.platform === "linkedin" || c.platform === "x") {
+      if (
+        (c.platform === "linkedin" || c.platform === "x") &&
+        c.account_type === "personal"
+      ) {
         map[c.platform] = c;
       }
     }
     return map;
   }, [conns]);
+
+  const linkedinAuthors = useMemo(() => {
+    return (conns || []).filter(
+      (c) => c.platform === "linkedin" && c.status === "active"
+    );
+  }, [conns]);
+
+  // Default the author dropdown to the personal connection whenever the
+  // set of LinkedIn connections changes.
+  useEffect(() => {
+    if (linkedinAuthors.length === 0) {
+      setLinkedinAuthorConnId(null);
+      return;
+    }
+    setLinkedinAuthorConnId((prev) => {
+      if (prev && linkedinAuthors.some((c) => c.id === prev)) return prev;
+      const personal = linkedinAuthors.find((c) => c.account_type === "personal");
+      return (personal || linkedinAuthors[0]).id;
+    });
+  }, [linkedinAuthors]);
 
   // Auto-enable LinkedIn if connected, leave X off by default unless connected.
   useEffect(() => {
@@ -155,12 +189,21 @@ export function PublishPanel({
   };
 
   const publish = async () => {
+    const selectedLinkedinAuthor = linkedinAuthors.find(
+      (c) => c.id === linkedinAuthorConnId
+    );
     const items = (Object.keys(enabled) as Platform[])
       .filter((p) => enabled[p])
       .map((p) => ({
         platform: p,
         content: variantFor(p),
         image_url: imageUrl || null,
+        // LinkedIn gets an extra field when the user picks a Page — the
+        // numeric org id is what ends up in `urn:li:organization:{id}`.
+        ...(p === "linkedin" &&
+        selectedLinkedinAuthor?.account_type === "organization"
+          ? { as_organization: selectedLinkedinAuthor.account_id }
+          : {}),
       }));
     if (items.length === 0) {
       setError("Pick at least one platform.");
@@ -248,7 +291,9 @@ export function PublishPanel({
                     {conn
                       ? expired
                         ? "Token expired — sign in again"
-                        : `Connected as ${conn.account_name || conn.account_id}`
+                        : p === "linkedin" && linkedinAuthors.length > 1
+                          ? `${linkedinAuthors.length} LinkedIn authors available`
+                          : `Connected as ${conn.account_name || conn.account_id}`
                       : "Not connected"}
                   </div>
                 </div>
@@ -275,6 +320,26 @@ export function PublishPanel({
                   </a>
                 )}
               </div>
+
+              {isOn && conn && !expired && p === "linkedin" && linkedinAuthors.length > 1 ? (
+                <label className="flex items-center gap-2 text-[11px] text-white/60">
+                  <span className="text-white/45">Post as</span>
+                  <select
+                    value={linkedinAuthorConnId ?? ""}
+                    onChange={(e) => setLinkedinAuthorConnId(e.target.value)}
+                    className="flex-1 bg-white/[0.03] border border-white/[0.08] rounded px-2 py-1 text-[12px] text-white/85"
+                  >
+                    {linkedinAuthors.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.account_name || a.account_id}
+                        {a.account_type === "organization"
+                          ? " (page)"
+                          : " (personal)"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
 
               {isOn && conn && !expired ? (
                 <div className="space-y-1">

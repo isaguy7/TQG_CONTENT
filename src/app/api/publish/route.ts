@@ -15,6 +15,9 @@ type PublishItem = {
   platform: Platform;
   content: string;
   image_url?: string | null;
+  // LinkedIn only — numeric org URN (e.g. "12345678") when posting as a
+  // Page the signed-in member administers. Omit / null for personal.
+  as_organization?: string | null;
 };
 
 type PerPlatformResult = {
@@ -115,7 +118,8 @@ export async function POST(req: NextRequest) {
       const r = await postToLinkedIn(
         auth.user.id,
         item.content,
-        item.image_url || null
+        item.image_url || null,
+        item.as_organization || null
       );
       results.push({
         platform: "linkedin",

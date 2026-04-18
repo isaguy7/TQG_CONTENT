@@ -115,12 +115,18 @@ export function Sidebar() {
               key={href}
               href={href}
               className={cn(
-                "block px-3 py-1.5 text-[13px] rounded transition-colors",
+                "relative block pl-4 pr-3 py-2 text-[13px] rounded transition-colors",
                 active
-                  ? "bg-white/[0.04] text-white/90"
-                  : "text-white/55 hover:text-white/90 hover:bg-white/[0.02]"
+                  ? "bg-primary/[0.08] text-white/95"
+                  : "text-white/55 hover:text-white/90 hover:bg-white/[0.025]"
               )}
             >
+              {/* 2px accent-green left bar marks the current route. Kept
+                  absolute so the text baselines line up between active /
+                  inactive items. */}
+              {active ? (
+                <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-primary-bright" />
+              ) : null}
               {label}
             </Link>
           );
