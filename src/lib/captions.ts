@@ -275,28 +275,63 @@ export async function fetchYoutubeCaptionsHttp(
   };
   log(`videoId=${videoId} lang=${language}`);
 
+  // Mimic a recent real Chrome session — Vercel egress IPs are well-known
+  // and a minimal UA looks bot-like. Sec-Fetch-* headers are what actual
+  // browsers send; omitting them correlates with YouTube serving consent
+  // interstitials or bot-check pages.
+  const browserHeaders: Record<string, string> = {
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+      "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    Accept:
+      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif," +
+      "image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Cache-Control": "no-cache",
+    Pragma: "no-cache",
+    "Sec-Ch-Ua":
+      '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+    "Sec-Ch-Ua-Mobile": "?0",
+    "Sec-Ch-Ua-Platform": '"Windows"',
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+    // CONSENT cookie pre-accepts the EU consent interstitial that otherwise
+    // replaces the watch page HTML (which breaks ytInitialPlayerResponse).
+    Cookie: "CONSENT=YES+1; SOCS=CAI",
+  };
+
   const watchUrl = `https://www.youtube.com/watch?v=${videoId}&hl=en`;
   log(`fetching ${watchUrl}`);
   let pageRes: Response;
   try {
     pageRes = await fetch(watchUrl, {
       signal,
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-          "(KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-      },
+      headers: browserHeaders,
+      redirect: "follow",
     });
   } catch (err) {
-    log(`watch page fetch failed: ${(err as Error).message}`);
+    const msg = (err as Error).message;
+    console.error(
+      `[captions-http] watch page fetch threw for videoId=${videoId}: ${msg}`
+    );
     throw new CaptionsHttpError(
-      `Network error fetching YouTube page: ${(err as Error).message}`,
+      `Network error fetching YouTube page: ${msg}`,
       "watch_page_blocked"
     );
   }
+  log(
+    `watch page response status=${pageRes.status} url=${pageRes.url} ` +
+      `content-type=${pageRes.headers.get("content-type") ?? "?"}`
+  );
   if (!pageRes.ok) {
-    log(`watch page HTTP ${pageRes.status}`);
+    console.error(
+      `[captions-http] watch page HTTP ${pageRes.status} for videoId=${videoId} ` +
+        `(final url=${pageRes.url})`
+    );
     throw new CaptionsHttpError(
       `YouTube returned HTTP ${pageRes.status} for the video page. ` +
         `YouTube may be blocking requests from this host's IP.`,
@@ -304,6 +339,12 @@ export async function fetchYoutubeCaptionsHttp(
     );
   }
   const html = await pageRes.text();
+  log(`watch page body length=${html.length}`);
+  if (/consent\.youtube\.com|"CONSENT"|action="https:\/\/consent\./i.test(html)) {
+    console.error(
+      `[captions-http] watch page appears to be a consent interstitial for videoId=${videoId}`
+    );
+  }
 
   const player = extractPlayerResponse(html);
   if (!player) {
@@ -345,16 +386,33 @@ export async function fetchYoutubeCaptionsHttp(
   trackUrl.searchParams.set("fmt", "json3");
   let captionRes: Response;
   try {
-    captionRes = await fetch(trackUrl.toString(), { signal });
+    captionRes = await fetch(trackUrl.toString(), {
+      signal,
+      headers: {
+        "User-Agent": browserHeaders["User-Agent"],
+        "Accept-Language": browserHeaders["Accept-Language"],
+        Accept: "*/*",
+        Referer: watchUrl,
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-site",
+      },
+    });
   } catch (err) {
-    log(`timedtext fetch failed: ${(err as Error).message}`);
+    const msg = (err as Error).message;
+    console.error(
+      `[captions-http] timedtext fetch threw for videoId=${videoId}: ${msg}`
+    );
     throw new CaptionsHttpError(
-      `Network error fetching captions: ${(err as Error).message}`,
+      `Network error fetching captions: ${msg}`,
       "timedtext_blocked"
     );
   }
+  log(`timedtext status=${captionRes.status} url=${trackUrl.toString()}`);
   if (!captionRes.ok) {
-    log(`timedtext HTTP ${captionRes.status}`);
+    console.error(
+      `[captions-http] timedtext HTTP ${captionRes.status} for videoId=${videoId}`
+    );
     throw new CaptionsHttpError(
       `YouTube returned HTTP ${captionRes.status} for the caption track.`,
       "timedtext_blocked"
