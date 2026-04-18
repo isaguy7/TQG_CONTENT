@@ -19,7 +19,7 @@ import { buildSystemPrompt, type FigureContext } from "@/lib/system-prompt";
 import { ConvertPreviews } from "@/components/ConvertPreviews";
 import { HookGenerator } from "@/components/HookGenerator";
 import { SlopChecker } from "@/components/SlopChecker";
-import { TypefullyPush } from "@/components/TypefullyPush";
+import { PublishPanel } from "@/components/PublishPanel";
 import { ImagePicker } from "@/components/ImagePicker";
 import { FigureContextPanel } from "@/components/FigureContextPanel";
 import { FigurePicker } from "@/components/FigurePicker";
@@ -524,13 +524,14 @@ export default function PostEditorPage() {
 
         <SlopChecker content={draft} postId={post.id} />
 
-        <TypefullyPush
+        <PublishPanel
           postId={post.id}
           content={draft}
           platform={post.platform}
           imageUrl={post.image_url}
-          onScheduled={() => {
-            save({ status: "scheduled" });
+          onPublished={() => {
+            // Refresh the post so the new status / scheduled_for shows up.
+            loadPost();
           }}
         />
 
