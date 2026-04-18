@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PageShell } from "@/components/PageShell";
+import { GapAlert } from "@/components/GapAlert";
 import { cn } from "@/lib/utils";
 
 type LocalPost = {
@@ -15,6 +16,7 @@ type LocalPost = {
   figure_id: string | null;
   labels: string[] | null;
   source: "local";
+  typefully?: boolean;
 };
 
 type TypefullyDraftView = {
@@ -156,44 +158,6 @@ export default function CalendarPage() {
     [data, load]
   );
 
-  // Flag days where >3 days passed with no LinkedIn post.
-  const staleDays = useMemo(() => {
-    if (!data || !grid) return new Set<string>();
-    const stale = new Set<string>();
-    // Find every day cell that is in the past and count days since last
-    // LinkedIn activity; flag if >= 3.
-    const todayMid = new Date(
-      Date.UTC(
-        today.getUTCFullYear(),
-        today.getUTCMonth(),
-        today.getUTCDate()
-      )
-    );
-    const liDates = data.posts
-      .filter((p) => p.platform === "linkedin")
-      .map((p) => new Date(p.published_at || p.scheduled_for || 0))
-      .filter((d) => !isNaN(d.getTime()))
-      .sort((a, b) => a.getTime() - b.getTime());
-
-    for (const c of grid) {
-      if (!c.date) continue;
-      if (c.date.getTime() > todayMid.getTime()) continue;
-      const lastBefore = liDates
-        .filter((d) => d.getTime() <= c.date!.getTime())
-        .pop();
-      const days = lastBefore
-        ? Math.floor(
-            (c.date.getTime() - lastBefore.getTime()) / (24 * 3600 * 1000)
-          )
-        : Math.floor(
-            (c.date.getTime() - todayMid.getTime() + 30 * 24 * 3600 * 1000) /
-              (24 * 3600 * 1000)
-          );
-      if (days >= 3) stale.add(c.date.toISOString().slice(0, 10));
-    }
-    return stale;
-  }, [data, grid, today]);
-
   const onDragStart = (id: string) => (e: React.DragEvent) => {
     setDragId(id);
     e.dataTransfer.effectAllowed = "move";
@@ -289,16 +253,6 @@ export default function CalendarPage() {
             />
           </section>
 
-          {data.alerts.length > 0 ? (
-            <div className="rounded-lg bg-amber-500/[0.08] border border-amber-400/30 p-3 space-y-1">
-              <div className="section-label text-amber-200">Gap alerts</div>
-              {data.alerts.map((a, i) => (
-                <div key={i} className="text-[12px] text-amber-100/85">
-                  · {a.message}
-                </div>
-              ))}
-            </div>
-          ) : null}
 
           {moveError ? (
             <div className="rounded-lg bg-danger/[0.08] border border-danger/30 p-3 text-[12px] text-danger">
@@ -342,8 +296,6 @@ export default function CalendarPage() {
                 const isToday =
                   dateStr ===
                   today.toISOString().slice(0, 10);
-                const isPast = c.date < today;
-                const isStale = staleDays.has(dateStr);
                 const isDropTarget = dropTarget === dateStr;
                 return (
                   <div
@@ -356,9 +308,6 @@ export default function CalendarPage() {
                     className={cn(
                       "min-h-[96px] p-1.5 border-r border-b border-white/[0.04] text-[11px]",
                       isToday && "ring-1 ring-primary-bright/40 bg-primary/5",
-                      isStale &&
-                        c.items.length === 0 &&
-                        "bg-amber-500/[0.05]",
                       isDropTarget &&
                         "ring-2 ring-primary-bright/80 bg-primary/10"
                     )}
@@ -374,25 +323,15 @@ export default function CalendarPage() {
                       >
                         {c.date.getUTCDate()}
                       </span>
-                      {isStale && c.items.length === 0 ? (
-                        <span
-                          className="text-[9px] text-amber-300/80"
-                          title="3+ days without LinkedIn activity"
-                        >
-                          !
-                        </span>
-                      ) : null}
                     </div>
                     <div className="space-y-0.5">
                       {c.items.length === 0 ? (
-                        !isPast ? (
-                          <Link
-                            href={`/content/new?date=${dateStr}`}
-                            className="block text-[10px] text-white/25 hover:text-white/60 border border-dashed border-white/[0.06] rounded px-1 py-0.5 text-center"
-                          >
-                            + New post
-                          </Link>
-                        ) : null
+                        <Link
+                          href={`/content/new?date=${dateStr}`}
+                          className="block text-[10px] text-white/25 hover:text-white/60 border border-dashed border-white/[0.06] rounded px-1 py-0.5 text-center"
+                        >
+                          + New post
+                        </Link>
                       ) : (
                         c.items.map((item) => {
                           if (item.source === "typefully") {
@@ -432,6 +371,11 @@ export default function CalendarPage() {
                               )}
                               title={item.title || "(untitled)"}
                             >
+                              {item.typefully ? (
+                                <span className="text-[9px] mr-1 opacity-60">
+                                  TF
+                                </span>
+                              ) : null}
                               {item.title || "(untitled)"}
                             </Link>
                           );
@@ -460,6 +404,10 @@ export default function CalendarPage() {
                 ))}
               </div>
             </div>
+          ) : null}
+
+          {data.alerts.length > 0 ? (
+            <GapAlert messages={data.alerts.map((a) => a.message)} />
           ) : null}
         </div>
       )}

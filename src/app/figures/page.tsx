@@ -141,20 +141,42 @@ export default function FiguresPage() {
                     <div className="text-[12px] text-white/65 line-clamp-2 leading-relaxed mb-3">
                       {f.bio_short}
                     </div>
-                    <div className="flex items-center gap-3 text-[11px] text-white/55 tabular-nums">
-                      <span title="Linked hadith">
-                        <span className="text-white/35">H</span> {f.hadith_ref_count}
-                      </span>
-                      <span title="Linked Quran ayahs">
-                        <span className="text-white/35">Q</span> {f.quran_ref_count}
-                      </span>
-                      <span title="Posts written">
-                        <span className="text-white/35">P</span> {f.posts_written}
-                      </span>
+                    <div className="flex items-center gap-2 text-[11px] tabular-nums flex-wrap">
                       {needsRefs ? (
-                        <span className="ml-auto px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-200 border border-amber-400/20">
-                          needs refs
+                        <span className="text-white/35 italic">
+                          No references yet
                         </span>
+                      ) : (
+                        <>
+                          {f.quran_ref_count > 0 ? (
+                            <span className="text-white/70">
+                              <span className="text-white/90 font-medium">
+                                {f.quran_ref_count}
+                              </span>{" "}
+                              Quran
+                            </span>
+                          ) : null}
+                          {f.quran_ref_count > 0 && f.hadith_ref_count > 0 ? (
+                            <span className="text-white/25">·</span>
+                          ) : null}
+                          {f.hadith_ref_count > 0 ? (
+                            <span className="text-white/70">
+                              <span className="text-white/90 font-medium">
+                                {f.hadith_ref_count}
+                              </span>{" "}
+                              Hadith
+                            </span>
+                          ) : null}
+                        </>
+                      )}
+                      {f.posts_written > 0 ? (
+                        <>
+                          <span className="text-white/25">·</span>
+                          <span className="text-white/55">
+                            {f.posts_written} post
+                            {f.posts_written === 1 ? "" : "s"}
+                          </span>
+                        </>
                       ) : null}
                     </div>
                   </Link>

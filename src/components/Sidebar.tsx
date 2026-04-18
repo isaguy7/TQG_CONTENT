@@ -4,16 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { TypefullyAutoSync } from "@/components/TypefullyAutoSync";
 
 const nav = [
   { href: "/", label: "Dashboard" },
   { href: "/content", label: "Content" },
   { href: "/figures", label: "Figures" },
   { href: "/clips", label: "Clips" },
-  { href: "/video", label: "Video" },
   { href: "/hadith", label: "References" },
   { href: "/calendar", label: "Calendar" },
-  { href: "/convert", label: "Convert" },
   { href: "/settings", label: "Settings" },
 ];
 
@@ -32,6 +31,7 @@ type RecentPost = {
   updated_at: string;
   deleted_at: string | null;
   labels: string[] | null;
+  performance?: Record<string, unknown> | null;
 };
 
 const statusDot: Record<PostStatus, string> = {
@@ -56,33 +56,30 @@ export function Sidebar() {
   const pathname = usePathname();
   const [recent, setRecent] = useState<RecentPost[] | null>(null);
 
+  const load = () => {
+    fetch("/api/posts?limit=5")
+      .then((r) => (r.ok ? r.json() : { posts: [] }))
+      .then((j) => {
+        const items = (j.posts || []) as RecentPost[];
+        setRecent(items.filter((p) => !p.deleted_at).slice(0, 5));
+      })
+      .catch(() => setRecent([]));
+  };
+
   useEffect(() => {
-    let cancelled = false;
-    const load = () => {
-      fetch("/api/posts?limit=5")
-        .then((r) => (r.ok ? r.json() : { posts: [] }))
-        .then((j) => {
-          if (cancelled) return;
-          const items = (j.posts || []) as RecentPost[];
-          setRecent(items.filter((p) => !p.deleted_at).slice(0, 5));
-        })
-        .catch(() => {
-          if (!cancelled) setRecent([]);
-        });
-    };
     load();
-    // Re-fetch when the user navigates back to the app or on interval so the
-    // sidebar reflects new drafts created in other tabs.
+    // Re-fetch when the user navigates back to the app so the sidebar reflects
+    // new drafts created in other tabs / Typefully syncs.
     const onFocus = () => load();
     window.addEventListener("focus", onFocus);
     return () => {
-      cancelled = true;
       window.removeEventListener("focus", onFocus);
     };
   }, [pathname]);
 
   return (
     <aside className="w-48 shrink-0 bg-sidebar border-r border-white/[0.06] flex flex-col">
+      <TypefullyAutoSync onDone={load} />
       <div className="h-12 flex items-center px-4 border-b border-white/[0.06]">
         <span className="text-[13px] font-semibold tracking-tight text-white/90">
           TQG Studio
@@ -127,7 +124,17 @@ export function Sidebar() {
             No drafts yet.
           </div>
         ) : (
-          recent.map((d) => (
+          recent.map((d) => {
+            const isTypefully = Boolean(
+              d.performance &&
+                ((d.performance as Record<string, unknown>)
+                  .imported_from_typefully ||
+                  Array.isArray(
+                    (d.performance as Record<string, unknown>)
+                      .typefully_draft_ids
+                  ))
+            );
+            return (
             <Link
               key={d.id}
               href={`/content/${d.id}`}
@@ -144,6 +151,14 @@ export function Sidebar() {
                 <span className="text-[12px] text-white/80 truncate leading-tight">
                   {d.title || "Untitled"}
                 </span>
+                {isTypefully ? (
+                  <span
+                    className="shrink-0 text-[8px] text-white/35 uppercase tracking-wider border border-white/[0.08] rounded px-1"
+                    title="Typefully"
+                  >
+                    TF
+                  </span>
+                ) : null}
               </div>
               <div className="text-[10px] text-white/30 mt-0.5 pl-[0.875rem] flex items-center gap-2">
                 <span className="uppercase tracking-wider">
@@ -165,12 +180,13 @@ export function Sidebar() {
                 </div>
               ) : null}
             </Link>
-          ))
+            );
+          })
         )}
       </div>
 
       <div className="px-4 py-2 border-t border-white/[0.06] text-[10px] text-white/30">
-        v0.3 · V3 refinements
+        v0.5 · polish + flow
       </div>
     </aside>
   );

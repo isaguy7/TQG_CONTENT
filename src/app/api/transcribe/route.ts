@@ -6,6 +6,10 @@ import { fetchYoutubeCaptions } from "@/lib/captions";
 import type { WhisperResult, WhisperSegment } from "@/lib/transcript";
 import { isHosted } from "@/lib/environment";
 
+const DEBUG_TRANSCRIBE =
+  process.env.TQG_TRANSCRIBE_DEBUG === "1" ||
+  process.env.NODE_ENV !== "production";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 // No maxDuration — local Node server, not Vercel.
@@ -46,6 +50,13 @@ function encodeLine(ev: Event): Uint8Array {
 }
 
 export async function POST(req: NextRequest) {
+  if (DEBUG_TRANSCRIBE) {
+    console.log(
+      `[transcribe] POST hit — isHosted=${isHosted()} VERCEL=${
+        process.env.VERCEL ?? "unset"
+      } VERCEL_ENV=${process.env.VERCEL_ENV ?? "unset"}`
+    );
+  }
   if (isHosted()) {
     return new Response(
       JSON.stringify({
@@ -100,7 +111,15 @@ export async function POST(req: NextRequest) {
 
         if (!forceWhisper) {
           send({ phase: "captions-try" });
+          if (DEBUG_TRANSCRIBE) console.log(`[transcribe] captions-try url=${url}`);
           const captions = await fetchYoutubeCaptions(url, "en", signal);
+          if (DEBUG_TRANSCRIBE) {
+            console.log(
+              `[transcribe] captions result: ${
+                captions ? `${captions.source} (${captions.segments.length} segs)` : "none"
+              }`
+            );
+          }
           if (signal.aborted) return;
           if (captions) {
             let meta: { title: string; duration: number | null; channel: string | null } = {

@@ -25,6 +25,13 @@ export type CaptionResult = WhisperResult & {
   source: "youtube-manual" | "youtube-auto";
 };
 
+export class YtDlpMissingError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "YtDlpMissingError";
+  }
+}
+
 /**
  * Attempt to fetch YouTube's auto-captions or manually-uploaded subtitles
  * via yt-dlp. Returns null if no captions are available. Prefers manual
@@ -105,6 +112,12 @@ export async function fetchYoutubeCaptions(
       source: isAuto ? "youtube-auto" : "youtube-manual",
     };
   } catch (err) {
+    // Surface fatal config errors (missing yt-dlp binary) so the client can
+    // render a real error. Only swallow "no captions available" style issues.
+    if (err instanceof YtDlpMissingError) {
+      log(`threw: ${err.message}`);
+      throw err;
+    }
     log(`threw: ${(err as Error).message}`);
     return null;
   } finally {
@@ -136,8 +149,9 @@ function runYtdlp(
       if (signal) signal.removeEventListener("abort", abortHandler);
       if (err.code === "ENOENT") {
         reject(
-          new Error(
-            `yt-dlp not found (tried '${cmd}'). Set YTDLP_USE_PYTHON=1 in .env.local`
+          new YtDlpMissingError(
+            `yt-dlp not found (tried '${cmd}'). Install with 'pip install yt-dlp' ` +
+              `then set YTDLP_USE_PYTHON=1 in .env.local, or point YTDLP_BIN at the binary.`
           )
         );
         return;

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PageShell } from "@/components/PageShell";
-import { TypefullySyncButton } from "@/components/TypefullySyncButton";
+import { TypefullyAutoSync } from "@/components/TypefullyAutoSync";
 import { cn } from "@/lib/utils";
 
 type PostStatus =
@@ -170,7 +170,7 @@ export default function ContentListPage() {
             {posts.length} post{posts.length === 1 ? "" : "s"}
           </div>
           <div className="flex items-center gap-2">
-            <TypefullySyncButton onDone={refresh} compact />
+            <TypefullyAutoSync onDone={refresh} />
             <button
               onClick={createDraft}
               disabled={creating}

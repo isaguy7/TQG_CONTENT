@@ -42,16 +42,6 @@ export default function SettingsPage() {
         </section>
 
         <section className="rounded-lg border border-border bg-surface p-6">
-          <h2 className="text-sm font-semibold mb-2">
-            yt-dlp upgrade (Phase 1+)
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            One-click upgrade button lands when Phase 1 wires up the Python
-            subprocess layer.
-          </p>
-        </section>
-
-        <section className="rounded-lg border border-border bg-surface p-6">
           <h2 className="text-sm font-semibold mb-3">Account</h2>
           <p className="text-[12px] text-muted-foreground mb-3">
             Sign out ends the session on this device. Accounts are managed from
