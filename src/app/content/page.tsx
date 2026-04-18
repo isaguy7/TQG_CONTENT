@@ -37,6 +37,15 @@ const statusBorder: Record<PostStatus, string> = {
 
 type Toast = { message: string; undo?: () => void; id: number } | null;
 
+const PIPELINE: PostStatus[] = [
+  "idea",
+  "drafting",
+  "review",
+  "ready",
+  "scheduled",
+  "published",
+];
+
 export default function ContentListPage() {
   const router = useRouter();
   const [posts, setPosts] = useState<PostRow[]>([]);
@@ -45,6 +54,7 @@ export default function ContentListPage() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast>(null);
+  const [stageFilter, setStageFilter] = useState<PostStatus | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = (message: string, undo?: () => void) => {
@@ -159,6 +169,17 @@ export default function ContentListPage() {
     refresh();
   };
 
+  const counts = posts.reduce<Record<PostStatus, number>>(
+    (acc, p) => {
+      acc[p.status] = (acc[p.status] ?? 0) + 1;
+      return acc;
+    },
+    { idea: 0, drafting: 0, review: 0, ready: 0, scheduled: 0, published: 0 }
+  );
+  const filtered = stageFilter
+    ? posts.filter((p) => p.status === stageFilter)
+    : posts;
+
   return (
     <PageShell
       title="Content"
@@ -181,6 +202,12 @@ export default function ContentListPage() {
           </div>
         </div>
 
+        <StatusPipeline
+          counts={counts}
+          active={stageFilter}
+          onPick={(s) => setStageFilter((prev) => (prev === s ? null : s))}
+        />
+
         {loading ? (
           <div className="text-[13px] text-white/40">Loading…</div>
         ) : error ? (
@@ -188,12 +215,21 @@ export default function ContentListPage() {
             {error}
           </div>
         ) : posts.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] p-8 text-center text-[13px] text-white/40">
-            No posts yet. Click &apos;New post&apos; to create a draft.
+          <EmptyState onCreate={createDraft} creating={creating} />
+        ) : filtered.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] p-6 text-center text-[12px] text-white/40">
+            No posts in{" "}
+            <span className="text-white/70 font-medium">{stageFilter}</span>.{" "}
+            <button
+              className="underline underline-offset-2 hover:text-white/80"
+              onClick={() => setStageFilter(null)}
+            >
+              Clear filter
+            </button>
           </div>
         ) : (
           <ul className="space-y-1">
-            {posts.map((p) => (
+            {filtered.map((p) => (
               <PostRowItem
                 key={p.id}
                 post={p}
@@ -299,7 +335,8 @@ function PostRowItem({
   return (
     <li
       className={cn(
-        "relative flex items-stretch pl-3 pr-2 py-2 rounded hover:bg-white/[0.03] transition-colors",
+        "relative flex items-stretch pl-3 pr-2 py-2.5 rounded-md transition-all duration-150",
+        "hover:bg-white/[0.04] hover:-translate-y-[1px] hover:shadow-md hover:shadow-black/20",
         statusBorder[post.status]
       )}
     >
@@ -405,6 +442,122 @@ function StatusBadge({ status }: { status: PostStatus }) {
     >
       {label}
     </span>
+  );
+}
+
+const STAGE_LABEL: Record<PostStatus, string> = {
+  idea: "Idea",
+  drafting: "Drafting",
+  review: "Review",
+  ready: "Ready",
+  scheduled: "Scheduled",
+  published: "Published",
+};
+
+const STAGE_DOT: Record<PostStatus, string> = {
+  idea: "bg-white/35",
+  drafting: "bg-warning",
+  review: "bg-warning",
+  ready: "bg-primary-bright",
+  scheduled: "bg-status-published",
+  published: "bg-status-published",
+};
+
+function StatusPipeline({
+  counts,
+  active,
+  onPick,
+}: {
+  counts: Record<PostStatus, number>;
+  active: PostStatus | null;
+  onPick: (s: PostStatus) => void;
+}) {
+  return (
+    <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-3 overflow-x-auto">
+      <div className="flex items-center gap-1 min-w-max">
+        {PIPELINE.map((stage, idx) => {
+          const isActive = active === stage;
+          const count = counts[stage];
+          return (
+            <div key={stage} className="flex items-center gap-1">
+              <button
+                onClick={() => onPick(stage)}
+                className={cn(
+                  "group flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-colors",
+                  isActive
+                    ? "bg-white/[0.08] ring-1 ring-white/15"
+                    : "hover:bg-white/[0.04]"
+                )}
+              >
+                <span
+                  className={cn(
+                    "shrink-0 w-2 h-2 rounded-full transition-all",
+                    count > 0 ? STAGE_DOT[stage] : "ring-1 ring-inset ring-white/20 bg-transparent"
+                  )}
+                />
+                <span
+                  className={cn(
+                    "text-[11px] uppercase tracking-wider",
+                    isActive ? "text-white/90" : "text-white/55 group-hover:text-white/85"
+                  )}
+                >
+                  {STAGE_LABEL[stage]}
+                </span>
+                <span
+                  className={cn(
+                    "text-[11px] tabular-nums",
+                    count === 0 ? "text-white/25" : "text-white/70"
+                  )}
+                >
+                  {count}
+                </span>
+              </button>
+              {idx < PIPELINE.length - 1 ? (
+                <span className="text-white/15 select-none">›</span>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({
+  onCreate,
+  creating,
+}: {
+  onCreate: () => void;
+  creating: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-10 text-center">
+      <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mb-3">
+        <span className="text-primary-bright text-lg">✍︎</span>
+      </div>
+      <div className="text-[14px] font-semibold text-white/90 mb-1">
+        Your drafts live here
+      </div>
+      <p className="text-[12px] text-white/55 max-w-xs mx-auto leading-relaxed mb-4">
+        Start a new post from scratch or transcribe a video to use as a
+        source. The editor picks up the rest.
+      </p>
+      <div className="flex items-center justify-center gap-2">
+        <button
+          onClick={onCreate}
+          disabled={creating}
+          className="px-3 py-1.5 rounded-md text-[12px] font-medium bg-primary text-primary-foreground hover:bg-primary-hover disabled:opacity-40"
+        >
+          {creating ? "Creating…" : "New blank post"}
+        </button>
+        <Link
+          href="/content/new"
+          className="px-3 py-1.5 rounded-md text-[12px] border border-white/[0.08] text-white/75 hover:text-white hover:bg-white/[0.04]"
+        >
+          From a video URL
+        </Link>
+      </div>
+    </div>
   );
 }
 

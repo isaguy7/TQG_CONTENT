@@ -286,7 +286,7 @@ export default function PostEditorPage() {
         </>
       }
     >
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-3xl mx-auto space-y-6">
         <div>
           <input
             value={post.title || ""}
@@ -326,7 +326,15 @@ export default function PostEditorPage() {
           </div>
         </div>
 
-        <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-5">
+        <div
+          className="rounded-xl border border-white/[0.06] p-6 shadow-lg shadow-black/10"
+          style={{
+            // Very subtle warm tint on top of the editor background — reads
+            // as paper-like under the dark theme without breaking contrast.
+            background:
+              "linear-gradient(180deg, rgba(255,245,230,0.018) 0%, rgba(255,255,255,0.022) 100%)",
+          }}
+        >
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -336,10 +344,10 @@ export default function PostEditorPage() {
               }
             }}
             placeholder="Write the post body here. This is the main thing on the page."
-            className="w-full bg-transparent border-0 text-[14px] text-white/90 placeholder-white/25 focus:outline-none min-h-[340px] leading-relaxed resize-y"
+            className="w-full bg-transparent border-0 text-[15px] text-white/90 placeholder-white/25 focus:outline-none min-h-[380px] leading-[1.8] resize-y tracking-[0.005em]"
           />
 
-          <div className="mt-4 pt-3 border-t border-white/[0.06]">
+          <div className="mt-5 pt-4 border-t border-white/[0.06]">
             <div className="flex items-center justify-between text-[12px]">
               <div className="flex items-center gap-3">
                 <span className={cn("font-medium tabular-nums", counterColor)}>
@@ -360,9 +368,9 @@ export default function PostEditorPage() {
                       : "Below optimal"}
               </span>
             </div>
-            <div className="mt-2 h-1.5 rounded-full bg-white/[0.05] overflow-hidden">
+            <div className="mt-2 h-2 rounded-full bg-white/[0.05] overflow-hidden">
               <div
-                className={cn("h-full transition-all", barColor)}
+                className={cn("h-full rounded-full transition-all", barColor)}
                 style={{ width: `${pct}%` }}
               />
             </div>

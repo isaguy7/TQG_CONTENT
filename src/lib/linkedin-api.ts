@@ -1,10 +1,13 @@
 /**
  * LinkedIn UGC posting using the access token captured during Supabase
  * OAuth login. The token has the `w_member_social` scope (requested in
- * the login page) and authors posts as the signed-in member.
+ * the login page) and authors posts as the signed-in member — or, when
+ * `asOrganization` is provided and the member administers that
+ * organisation, as the organisation itself.
  */
 import {
   getConnection,
+  getOrgConnection,
   markConnectionStatus,
   type OAuthConnection,
 } from "@/lib/oauth-connections";
@@ -18,13 +21,20 @@ export type PostResult =
 export async function postToLinkedIn(
   userId: string,
   content: string,
-  imageUrl?: string | null
+  imageUrl?: string | null,
+  asOrganization?: string | null
 ): Promise<PostResult> {
-  const conn = await getConnection(userId, "linkedin");
+  // If asOrganization is supplied we look up the per-Page connection row —
+  // it may have a different account_name but reuses the member's token.
+  const conn = asOrganization
+    ? await getOrgConnection(userId, "linkedin", asOrganization)
+    : await getConnection(userId, "linkedin", "personal");
+
   if (!conn || conn.status !== "active") {
+    const target = asOrganization ? "LinkedIn Page" : "LinkedIn";
     return {
       success: false,
-      error: "LinkedIn not connected. Sign in with LinkedIn first.",
+      error: `${target} not connected. Sign in with LinkedIn first.`,
       needsReauth: true,
     };
   }
@@ -38,7 +48,9 @@ export async function postToLinkedIn(
     };
   }
 
-  const author = `urn:li:person:${conn.account_id}`;
+  const author = asOrganization
+    ? `urn:li:organization:${asOrganization}`
+    : `urn:li:person:${conn.account_id}`;
   const body = {
     author,
     lifecycleState: "PUBLISHED",

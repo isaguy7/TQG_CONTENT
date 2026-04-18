@@ -3,11 +3,20 @@
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import { cn } from "@/lib/utils";
+import { LinkedInPages } from "@/components/LinkedInPages";
 
 type OAuthState = {
   account_name: string | null;
+  account_type?: "personal" | "organization";
   status: "active" | "expired" | "revoked";
   token_expires_at: string | null;
+};
+
+type LinkedInOrg = {
+  id: string;
+  account_id: string;
+  account_name: string | null;
+  status: "active" | "expired" | "revoked";
 };
 
 type IntegrationsPayload = {
@@ -17,7 +26,11 @@ type IntegrationsPayload = {
     typefully?: { connected: boolean; social_set?: boolean };
     unsplash?: { connected: boolean };
     pexels?: { connected: boolean };
-    linkedin?: { connected: boolean; oauth?: OAuthState | null };
+    linkedin?: {
+      connected: boolean;
+      oauth?: OAuthState | null;
+      organizations?: LinkedInOrg[];
+    };
     x?: { connected: boolean; oauth?: OAuthState | null };
     meta?: { connected: boolean; oauth_ready?: boolean };
     whisperx?: { model: string; device: string; batchSize: number };
@@ -44,6 +57,7 @@ function formatExpiry(iso: string | null): string {
 
 function Row({
   label,
+  badge,
   connected,
   status,
   details,
@@ -51,6 +65,7 @@ function Row({
   action,
 }: {
   label: string;
+  badge?: "personal" | "organization";
   connected: boolean;
   status?: OAuthState["status"];
   details?: Array<[string, string]>;
@@ -72,7 +87,21 @@ function Row({
       />
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline justify-between gap-3">
-          <span className="text-[13px] font-medium text-white/85">{label}</span>
+          <span className="text-[13px] font-medium text-white/85 flex items-center gap-2">
+            {label}
+            {badge ? (
+              <span
+                className={cn(
+                  "px-1.5 py-0.5 rounded-full text-[9px] uppercase tracking-wider",
+                  badge === "organization"
+                    ? "bg-sky-500/15 text-sky-200 border border-sky-400/25"
+                    : "bg-white/[0.05] text-white/55 border border-white/[0.08]"
+                )}
+              >
+                {badge}
+              </span>
+            ) : null}
+          </span>
           <span
             className={cn(
               "text-[11px] shrink-0",
@@ -276,7 +305,8 @@ export function IntegrationsDetail({
       {showAccounts ? (
         <>
           <Row
-            label="LinkedIn (direct posting)"
+            label="LinkedIn — personal"
+            badge="personal"
             connected={!!i.linkedin?.connected}
             status={i.linkedin?.oauth?.status}
             details={
@@ -289,8 +319,26 @@ export function IntegrationsDetail({
             }
             action={linkedinAction}
           />
+          {(i.linkedin?.organizations || [])
+            .filter((o) => o.status === "active")
+            .map((org) => (
+              <Row
+                key={org.id}
+                label={`LinkedIn — ${org.account_name || "Page"}`}
+                badge="organization"
+                connected
+                details={[
+                  ["Type", "Company Page"],
+                  ["Org URN", `urn:li:organization:${org.account_id}`],
+                ]}
+              />
+            ))}
+          <div className="pt-2 pb-3 pl-6 border-b border-white/[0.05]">
+            <LinkedInPages linkedinConnected={!!i.linkedin?.connected} />
+          </div>
           <Row
             label="X (direct posting)"
+            badge="personal"
             connected={!!i.x?.connected}
             status={i.x?.oauth?.status}
             details={

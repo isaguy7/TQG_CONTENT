@@ -306,8 +306,9 @@ export default function CalendarPage() {
                       if (dropTarget === dateStr) setDropTarget(null);
                     }}
                     className={cn(
-                      "min-h-[96px] p-1.5 border-r border-b border-white/[0.04] text-[11px]",
-                      isToday && "ring-1 ring-primary-bright/40 bg-primary/5",
+                      "min-h-[96px] p-1.5 border-r border-b border-white/[0.04] text-[11px] transition-colors hover:bg-white/[0.025]",
+                      isToday &&
+                        "ring-1 ring-inset ring-primary-bright/60 bg-primary/[0.08]",
                       isDropTarget &&
                         "ring-2 ring-primary-bright/80 bg-primary/10"
                     )}
@@ -427,7 +428,7 @@ function TargetBar({
   const pct = target > 0 ? Math.min(100, (actual / target) * 100) : 0;
   const done = actual >= target;
   return (
-    <div className="rounded-md border border-white/[0.06] bg-white/[0.02] p-3">
+    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 transition-colors hover:bg-white/[0.035]">
       <div className="flex items-baseline justify-between">
         <div className="text-[11px] text-white/50">{label}</div>
         <div
@@ -439,13 +440,15 @@ function TargetBar({
           {actual}/{target}
         </div>
       </div>
-      <div className="mt-2 h-1.5 rounded-full bg-white/[0.05] overflow-hidden">
+      <div className="mt-2 h-2 rounded-full bg-white/[0.05] overflow-hidden">
         <div
-          className={cn(
-            "h-full transition-all",
-            done ? "bg-primary-bright" : "bg-white/50"
-          )}
-          style={{ width: `${pct}%` }}
+          className="h-full rounded-full transition-all"
+          style={{
+            width: `${pct}%`,
+            background: done
+              ? "linear-gradient(90deg, hsl(var(--primary-hover)) 0%, hsl(var(--primary-bright)) 100%)"
+              : "linear-gradient(90deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.55) 100%)",
+          }}
         />
       </div>
     </div>

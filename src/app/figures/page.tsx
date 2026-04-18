@@ -35,6 +35,27 @@ const TYPE_COLOR: Record<Figure["type"], string> = {
   tabii: "bg-violet-500/15 text-violet-200 border-violet-400/30",
 };
 
+// Type-keyed 4px left border on each card. Using raw rgba so the class
+// survives Tailwind's tree-shaker without needing arbitrary values on
+// border-* that would be harder to tweak later.
+const TYPE_BORDER: Record<Figure["type"], string> = {
+  sahabi: "#10b981", // emerald-500
+  prophet: "#f59e0b", // amber-500
+  scholar: "#0ea5e9", // sky-500
+  tabii: "#8b5cf6", // violet-500
+};
+
+const TYPE_HEADER_GRADIENT: Record<Figure["type"], string> = {
+  sahabi:
+    "linear-gradient(135deg, rgba(16,185,129,0.12) 0%, transparent 70%)",
+  prophet:
+    "linear-gradient(135deg, rgba(245,158,11,0.12) 0%, transparent 70%)",
+  scholar:
+    "linear-gradient(135deg, rgba(14,165,233,0.12) 0%, transparent 70%)",
+  tabii:
+    "linear-gradient(135deg, rgba(139,92,246,0.12) 0%, transparent 70%)",
+};
+
 export default function FiguresPage() {
   const [figures, setFigures] = useState<Figure[] | null>(null);
   const [filter, setFilter] = useState<"all" | Figure["type"]>("all");
@@ -108,75 +129,77 @@ export default function FiguresPage() {
                 <li key={f.id}>
                   <Link
                     href={`/figures/${f.id}`}
-                    className="block rounded-lg bg-white/[0.03] border border-white/[0.06] p-4 hover:bg-white/[0.05] hover:border-white/[0.12] transition-colors"
+                    className="card-interactive block rounded-xl bg-white/[0.03] border border-white/[0.06] overflow-hidden shadow-lg shadow-black/10"
+                    style={{
+                      borderLeft: `4px solid ${TYPE_BORDER[f.type]}`,
+                    }}
                   >
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="min-w-0">
-                        <div className="text-[14px] font-semibold text-white/90 truncate">
-                          {f.name_en}
-                        </div>
-                        {f.name_ar ? (
-                          <div
-                            dir="rtl"
-                            className="text-[13px] text-white/60 mt-0.5"
-                          >
-                            {f.name_ar}
+                    <div
+                      className="p-4"
+                      style={{ background: TYPE_HEADER_GRADIENT[f.type] }}
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="min-w-0">
+                          <div className="text-[14px] font-semibold text-white/90 truncate">
+                            {f.name_en}
                           </div>
-                        ) : null}
+                          {f.name_ar ? (
+                            <div
+                              dir="rtl"
+                              className="text-[13px] text-white/60 mt-0.5"
+                            >
+                              {f.name_ar}
+                            </div>
+                          ) : null}
+                        </div>
+                        <span
+                          className={cn(
+                            "px-2 py-0.5 rounded-full border text-[10px] uppercase tracking-wider shrink-0",
+                            TYPE_COLOR[f.type]
+                          )}
+                        >
+                          {TYPE_LABEL[f.type]}
+                        </span>
                       </div>
-                      <span
-                        className={cn(
-                          "px-2 py-0.5 rounded-full border text-[10px] uppercase tracking-wider shrink-0",
-                          TYPE_COLOR[f.type]
-                        )}
-                      >
-                        {TYPE_LABEL[f.type]}
-                      </span>
-                    </div>
-                    {f.title ? (
-                      <div className="text-[11px] text-white/50 mb-2">
-                        {f.title}
+                      {f.title ? (
+                        <div className="text-[11px] text-white/50 mb-2">
+                          {f.title}
+                        </div>
+                      ) : null}
+                      <div className="text-[12px] text-white/65 line-clamp-2 leading-relaxed">
+                        {f.bio_short}
                       </div>
-                    ) : null}
-                    <div className="text-[12px] text-white/65 line-clamp-2 leading-relaxed mb-3">
-                      {f.bio_short}
                     </div>
-                    <div className="flex items-center gap-2 text-[11px] tabular-nums flex-wrap">
+                    <div className="px-4 pb-4 pt-3 border-t border-white/[0.05] flex items-center gap-2 flex-wrap">
                       {needsRefs ? (
-                        <span className="text-white/35 italic">
+                        <span className="text-[11px] text-white/35 italic">
                           No references yet
                         </span>
                       ) : (
                         <>
                           {f.quran_ref_count > 0 ? (
-                            <span className="text-white/70">
-                              <span className="text-white/90 font-medium">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.05] border border-white/[0.06] text-[11px] tabular-nums">
+                              <span className="text-white/95 font-semibold">
                                 {f.quran_ref_count}
-                              </span>{" "}
-                              Quran
+                              </span>
+                              <span className="text-white/55">Quran</span>
                             </span>
                           ) : null}
-                          {f.quran_ref_count > 0 && f.hadith_ref_count > 0 ? (
-                            <span className="text-white/25">·</span>
-                          ) : null}
                           {f.hadith_ref_count > 0 ? (
-                            <span className="text-white/70">
-                              <span className="text-white/90 font-medium">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.05] border border-white/[0.06] text-[11px] tabular-nums">
+                              <span className="text-white/95 font-semibold">
                                 {f.hadith_ref_count}
-                              </span>{" "}
-                              Hadith
+                              </span>
+                              <span className="text-white/55">Hadith</span>
                             </span>
                           ) : null}
                         </>
                       )}
                       {f.posts_written > 0 ? (
-                        <>
-                          <span className="text-white/25">·</span>
-                          <span className="text-white/55">
-                            {f.posts_written} post
-                            {f.posts_written === 1 ? "" : "s"}
-                          </span>
-                        </>
+                        <span className="ml-auto text-[11px] text-white/55">
+                          {f.posts_written} post
+                          {f.posts_written === 1 ? "" : "s"}
+                        </span>
                       ) : null}
                     </div>
                   </Link>

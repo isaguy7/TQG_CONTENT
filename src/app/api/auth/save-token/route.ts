@@ -77,25 +77,37 @@ export async function POST(req: NextRequest) {
       : ["tweet.read", "tweet.write", "users.read", "offline.access"];
 
   const db = getSupabaseServer();
-  const { error } = await db.from("oauth_connections").upsert(
-    {
-      user_id: user.id,
-      platform,
-      account_id: accountId,
-      account_name: accountName,
-      access_token: body.provider_token,
-      refresh_token: body.provider_refresh_token ?? null,
-      token_expires_at: expiresAt,
-      scopes,
-      metadata: {
-        avatar_url: identity.avatar_url ?? identity.picture ?? null,
-        email: user.email,
-      },
-      status: "active",
-      updated_at: new Date().toISOString(),
+  // OAuth callbacks always represent the signed-in member — LinkedIn Pages
+  // are added as separate rows via /api/auth/linkedin-pages.
+  //
+  // Drop any prior personal row before inserting so a re-login lands
+  // cleanly even if LinkedIn handed us a different account_id (rare, but
+  // the partial unique `(user, platform) where account_type='personal'`
+  // would otherwise reject the insert).
+  await db
+    .from("oauth_connections")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("platform", platform)
+    .eq("account_type", "personal");
+
+  const { error } = await db.from("oauth_connections").insert({
+    user_id: user.id,
+    platform,
+    account_type: "personal",
+    account_id: accountId,
+    account_name: accountName,
+    access_token: body.provider_token,
+    refresh_token: body.provider_refresh_token ?? null,
+    token_expires_at: expiresAt,
+    scopes,
+    metadata: {
+      avatar_url: identity.avatar_url ?? identity.picture ?? null,
+      email: user.email,
     },
-    { onConflict: "user_id,platform" }
-  );
+    status: "active",
+    updated_at: new Date().toISOString(),
+  });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

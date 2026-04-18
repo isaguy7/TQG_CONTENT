@@ -275,14 +275,20 @@ export async function fetchYoutubeCaptionsHttp(
   };
   log(`videoId=${videoId} lang=${language}`);
 
-  // Mimic a recent real Chrome session — Vercel egress IPs are well-known
-  // and a minimal UA looks bot-like. Sec-Fetch-* headers are what actual
-  // browsers send; omitting them correlates with YouTube serving consent
-  // interstitials or bot-check pages.
-  const browserHeaders: Record<string, string> = {
-    "User-Agent":
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-      "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  // Rotate between a desktop-Chrome and a mobile-Safari profile — Vercel
+  // egress IPs are well-known to YouTube's bot heuristics, and serving
+  // the same UA every time correlates with bot-check interstitials. If
+  // the desktop attempt yields a consent page / missing player data,
+  // we retry against m.youtube.com with the mobile UA.
+  const desktopUa =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+  const mobileUa =
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) " +
+    "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1";
+
+  const buildHeaders = (ua: string, mobile: boolean): Record<string, string> => ({
+    "User-Agent": ua,
     Accept:
       "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif," +
       "image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
@@ -290,70 +296,132 @@ export async function fetchYoutubeCaptionsHttp(
     "Accept-Encoding": "gzip, deflate, br",
     "Cache-Control": "no-cache",
     Pragma: "no-cache",
-    "Sec-Ch-Ua":
-      '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-    "Sec-Ch-Ua-Mobile": "?0",
-    "Sec-Ch-Ua-Platform": '"Windows"',
+    ...(mobile
+      ? {}
+      : {
+          "Sec-Ch-Ua":
+            '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+          "Sec-Ch-Ua-Mobile": "?0",
+          "Sec-Ch-Ua-Platform": '"Windows"',
+        }),
     "Sec-Fetch-Dest": "document",
     "Sec-Fetch-Mode": "navigate",
     "Sec-Fetch-Site": "none",
     "Sec-Fetch-User": "?1",
     "Upgrade-Insecure-Requests": "1",
-    // CONSENT cookie pre-accepts the EU consent interstitial that otherwise
+    // CONSENT pre-accepts the EU consent interstitial that otherwise
     // replaces the watch page HTML (which breaks ytInitialPlayerResponse).
     Cookie: "CONSENT=YES+1; SOCS=CAI",
+  });
+
+  type FetchAttempt = { html: string; finalUrl: string; browserHeaders: Record<string, string>; watchUrl: string };
+  const attempt = async (
+    watchUrl: string,
+    ua: string,
+    mobile: boolean
+  ): Promise<FetchAttempt> => {
+    log(`fetching ${watchUrl} ua=${mobile ? "mobile" : "desktop"}`);
+    const browserHeaders = buildHeaders(ua, mobile);
+    let pageRes: Response;
+    try {
+      pageRes = await fetch(watchUrl, {
+        signal,
+        headers: browserHeaders,
+        redirect: "follow",
+      });
+    } catch (err) {
+      const msg = (err as Error).message;
+      console.error(
+        `[captions-http] watch page fetch threw for videoId=${videoId}: ${msg}`
+      );
+      throw new CaptionsHttpError(
+        `Network error fetching YouTube page: ${msg}`,
+        "watch_page_blocked"
+      );
+    }
+    log(
+      `watch page response status=${pageRes.status} url=${pageRes.url} ` +
+        `content-type=${pageRes.headers.get("content-type") ?? "?"}`
+    );
+    if (!pageRes.ok) {
+      console.error(
+        `[captions-http] watch page HTTP ${pageRes.status} for videoId=${videoId} ` +
+          `(final url=${pageRes.url})`
+      );
+      throw new CaptionsHttpError(
+        `YouTube returned HTTP ${pageRes.status} for the video page. ` +
+          `YouTube may be blocking requests from this host's IP.`,
+        "watch_page_blocked"
+      );
+    }
+    const html = await pageRes.text();
+    log(`watch page body length=${html.length}`);
+    return { html, finalUrl: pageRes.url, browserHeaders, watchUrl };
   };
 
-  const watchUrl = `https://www.youtube.com/watch?v=${videoId}&hl=en`;
-  log(`fetching ${watchUrl}`);
-  let pageRes: Response;
+  // Primary attempt: desktop Chrome on www.youtube.com.
+  let primary: FetchAttempt;
   try {
-    pageRes = await fetch(watchUrl, {
-      signal,
-      headers: browserHeaders,
-      redirect: "follow",
-    });
-  } catch (err) {
-    const msg = (err as Error).message;
-    console.error(
-      `[captions-http] watch page fetch threw for videoId=${videoId}: ${msg}`
+    primary = await attempt(
+      `https://www.youtube.com/watch?v=${videoId}&hl=en`,
+      desktopUa,
+      false
     );
-    throw new CaptionsHttpError(
-      `Network error fetching YouTube page: ${msg}`,
-      "watch_page_blocked"
+  } catch (primaryErr) {
+    // First attempt failed completely — try the mobile endpoint before
+    // giving up. Keeps us on the HTTP-only path even when Vercel IPs get
+    // a harder block from the www endpoint.
+    log(
+      `primary attempt failed (${(primaryErr as Error).message}); ` +
+        `retrying on m.youtube.com`
     );
-  }
-  log(
-    `watch page response status=${pageRes.status} url=${pageRes.url} ` +
-      `content-type=${pageRes.headers.get("content-type") ?? "?"}`
-  );
-  if (!pageRes.ok) {
-    console.error(
-      `[captions-http] watch page HTTP ${pageRes.status} for videoId=${videoId} ` +
-        `(final url=${pageRes.url})`
-    );
-    throw new CaptionsHttpError(
-      `YouTube returned HTTP ${pageRes.status} for the video page. ` +
-        `YouTube may be blocking requests from this host's IP.`,
-      "watch_page_blocked"
+    primary = await attempt(
+      `https://m.youtube.com/watch?v=${videoId}&hl=en`,
+      mobileUa,
+      true
     );
   }
-  const html = await pageRes.text();
-  log(`watch page body length=${html.length}`);
-  if (/consent\.youtube\.com|"CONSENT"|action="https:\/\/consent\./i.test(html)) {
+
+  let player = extractPlayerResponse(primary.html);
+  let { browserHeaders, watchUrl } = primary;
+
+  const looksLikeConsent =
+    /consent\.youtube\.com|"CONSENT"|action="https:\/\/consent\./i.test(
+      primary.html
+    );
+  if (looksLikeConsent) {
     console.error(
       `[captions-http] watch page appears to be a consent interstitial for videoId=${videoId}`
     );
   }
 
-  const player = extractPlayerResponse(html);
   if (!player) {
     log(
-      `ytInitialPlayerResponse not found in page (html length=${html.length})`
+      `ytInitialPlayerResponse not found in primary (html length=${primary.html.length}); ` +
+        `retrying on m.youtube.com with mobile UA`
     );
+    try {
+      const secondary = await attempt(
+        `https://m.youtube.com/watch?v=${videoId}&hl=en`,
+        mobileUa,
+        true
+      );
+      const retryPlayer = extractPlayerResponse(secondary.html);
+      if (retryPlayer) {
+        player = retryPlayer;
+        browserHeaders = secondary.browserHeaders;
+        watchUrl = secondary.watchUrl;
+        log(`secondary attempt succeeded, player parsed`);
+      }
+    } catch (secondaryErr) {
+      log(`secondary attempt threw: ${(secondaryErr as Error).message}`);
+    }
+  }
+
+  if (!player) {
     throw new CaptionsHttpError(
-      "Couldn't parse YouTube's player data. The page format may have " +
-        "changed, or YouTube served a consent/bot-check page.",
+      "Couldn't parse YouTube's player data after desktop + mobile retries. " +
+        "The page format may have changed, or YouTube is IP-blocking this host.",
       "player_not_parsed"
     );
   }
