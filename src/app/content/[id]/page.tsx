@@ -524,15 +524,6 @@ export default function PostEditorPage() {
 
         <SlopChecker content={draft} postId={post.id} />
 
-        <ImagePicker
-          imageUrl={post.image_url}
-          imageRationale={post.image_rationale}
-          onChange={(image_url, image_rationale) => {
-            save({ image_url, image_rationale });
-            setPost({ ...post, image_url, image_rationale });
-          }}
-        />
-
         <TypefullyPush
           postId={post.id}
           content={draft}
@@ -630,6 +621,15 @@ export default function PostEditorPage() {
             </details>
           ) : null}
         </section>
+
+        <ImagePicker
+          imageUrl={post.image_url}
+          imageRationale={post.image_rationale}
+          onChange={(image_url, image_rationale) => {
+            save({ image_url, image_rationale });
+            setPost({ ...post, image_url, image_rationale });
+          }}
+        />
       </div>
     </PageShell>
   );
