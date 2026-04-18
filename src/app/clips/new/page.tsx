@@ -73,6 +73,14 @@ export default function NewClipBatchPage() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [quranImported, setQuranImported] = useState(true);
   const [loadingSurah, setLoadingSurah] = useState<number | null>(null);
+  const [hosted, setHosted] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/environment", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setHosted(!!j?.hosted))
+      .catch(() => setHosted(false));
+  }, []);
 
   const refreshAssets = () => {
     fetch("/api/clips/assets")
@@ -259,6 +267,44 @@ export default function NewClipBatchPage() {
     } finally {
       setRendering(false);
     }
+  };
+
+  const exportCaptions = () => {
+    if (clips.length === 0) return;
+    const pad = (n: number, w = 2) => String(n).padStart(w, "0");
+    const srtTime = (t: number) => {
+      const tt = Math.max(0, t);
+      const h = Math.floor(tt / 3600);
+      const m = Math.floor((tt - h * 3600) / 60);
+      const s = tt - h * 3600 - m * 60;
+      const sec = Math.floor(s);
+      const ms = Math.round((s - sec) * 1000);
+      return `${pad(h)}:${pad(m)}:${pad(sec)},${pad(ms, 3)}`;
+    };
+    const lines: string[] = [];
+    let cursor = 0;
+    clips.forEach((c, i) => {
+      const dur = Math.max(0, c.end - c.start);
+      const start = cursor;
+      const end = cursor + dur;
+      const text = [c.arabic, c.english].filter((t) => t && t.trim()).join("\n");
+      if (text) {
+        lines.push(String(i + 1));
+        lines.push(`${srtTime(start)} --> ${srtTime(end)}`);
+        lines.push(text);
+        lines.push("");
+      }
+      cursor = end;
+    });
+    const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${batchName || "clip-captions"}.srt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   };
 
   const groupedSuggestions = useMemo(() => {
@@ -633,22 +679,42 @@ export default function NewClipBatchPage() {
 
         {/* Render */}
         <section className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <span className="section-label">Render</span>
+          <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+            <span className="section-label">Render / export</span>
             <input
               value={batchName}
               onChange={(e) => setBatchName(e.target.value)}
               placeholder="Batch name (optional)"
-              className="flex-1 bg-transparent border border-white/[0.08] rounded px-2 py-1 text-[12px] text-white/85"
+              className="flex-1 min-w-[140px] bg-transparent border border-white/[0.08] rounded px-2 py-1 text-[12px] text-white/85"
             />
             <button
+              onClick={exportCaptions}
+              disabled={clips.length === 0}
+              className="px-3 py-1.5 rounded text-[12px] border border-white/[0.1] text-white/80 hover:text-white hover:bg-white/[0.05] disabled:opacity-40"
+            >
+              Export .srt
+            </button>
+            <button
               onClick={render}
-              disabled={!canRender || rendering}
+              disabled={!canRender || rendering || hosted}
+              title={
+                hosted
+                  ? "Local rendering required — run the Studio on your machine to render"
+                  : undefined
+              }
               className="px-3 py-1.5 rounded text-[12px] bg-primary text-primary-foreground hover:bg-primary-hover disabled:opacity-40"
             >
               {rendering ? "Rendering…" : "Render all"}
             </button>
           </div>
+          {hosted ? (
+            <div className="text-[12px] text-amber-200/90 bg-amber-500/[0.08] border border-amber-400/25 rounded px-2 py-1.5 mb-2 leading-relaxed">
+              Local rendering required. On Vercel you can still plan clips,
+              pick backgrounds, and export captions — run the Studio locally
+              (<code className="font-mono">npm run dev</code>) to render the
+              final MP4s.
+            </div>
+          ) : null}
           {!canRender ? (
             <div className="text-[12px] text-white/40">
               Each clip needs a recitation, background, Arabic text, and a

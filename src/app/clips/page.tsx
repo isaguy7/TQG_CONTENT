@@ -31,17 +31,10 @@ export default function ClipsPage() {
     >
       <div className="max-w-2xl space-y-4">
         {hosted ? (
-          <div className="rounded-lg bg-amber-500/[0.08] border border-amber-400/30 p-4 text-[13px] text-amber-100 leading-relaxed">
-            <div className="font-medium mb-1">
-              Clip rendering is local-only
-            </div>
-            <p className="text-amber-100/80 text-[12px]">
-              This page needs ffmpeg + NVENC on the machine running the app.
-              The hosted Vercel deployment doesn&apos;t have GPU access, so
-              &quot;New clip batch&quot; will return 501 here. Run the Studio
-              locally (<code className="font-mono">npm run dev</code>) to
-              render clips.
-            </p>
+          <div className="rounded-lg bg-white/[0.03] border border-white/[0.08] p-3 text-[12px] text-white/60 leading-relaxed">
+            Note: final ffmpeg/NVENC rendering runs on your local Studio. On
+            Vercel you can still plan batches, match ayahs, search Pexels, and
+            export captions — only the &quot;Render&quot; step requires local.
           </div>
         ) : null}
 
@@ -53,8 +46,8 @@ export default function ClipsPage() {
             New clip batch →
           </div>
           <div className="text-[12px] text-white/60 mt-1">
-            Drop a recitation, match ayahs, pick backgrounds, batch-render
-            with NVENC.
+            Drop a recitation, match ayahs, pick backgrounds, export captions,
+            batch-render with NVENC locally.
           </div>
         </Link>
 
