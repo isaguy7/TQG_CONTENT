@@ -128,6 +128,12 @@ export function StockBackgrounds({
           })),
         }),
       });
+      if (res.status === 501) {
+        setMessage(
+          "Downloads only run on the local Studio — previews still work here. Run the app locally to save backgrounds."
+        );
+        return;
+      }
       const j = await res.json();
       const okPaths = (j.results || [])
         .filter((r: { ok: boolean; path?: string }) => r.ok && r.path)
@@ -163,6 +169,12 @@ export function StockBackgrounds({
           ],
         }),
       });
+      if (res.status === 501) {
+        setMessage(
+          "Downloads only run on the local Studio — previews still work here."
+        );
+        return;
+      }
       const j = await res.json();
       const paths = (j.results || [])
         .filter((r: { ok: boolean; path?: string }) => r.ok && r.path)
