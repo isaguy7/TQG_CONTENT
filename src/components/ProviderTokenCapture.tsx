@@ -31,7 +31,14 @@ export function ProviderTokenCapture({
         : null,
       provider_refresh_token: !!session?.provider_refresh_token,
       provider: session?.user?.app_metadata?.provider ?? null,
+      providers: session?.user?.app_metadata?.providers ?? null,
+      identities_count: session?.user?.identities?.length ?? 0,
+      identities: session?.user?.identities?.map((i) => i.provider) ?? [],
       email: session?.user?.email ?? null,
+      expires_in: session?.expires_in ?? null,
+      // Expose every top-level key on the session so we can see exactly
+      // what Supabase is handing us in each event.
+      session_keys: session ? Object.keys(session) : [],
     });
 
     const attemptSave = async (

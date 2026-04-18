@@ -153,19 +153,41 @@ export function IntegrationsDetail({
       provider === "linkedin_oidc"
         ? "openid profile email w_member_social"
         : "tweet.read tweet.write users.read offline.access";
-    const { error } = await supabase.auth.signInWithOAuth({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      provider: provider as any,
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/settings")}`,
-        scopes,
-      },
-    });
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent("/settings")}`;
+
+    // If the user is already signed in (they reached Settings), prefer
+    // linkIdentity — it attaches the provider to the existing account
+    // without starting a fresh sign-in flow, which sidesteps the PKCE
+    // state-cookie issues we were hitting with signInWithOAuth on X.
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    let error: { message: string } | null = null;
+    if (user) {
+      const { error: linkError } = await supabase.auth.linkIdentity({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        provider: provider as any,
+        options: { redirectTo, scopes },
+      });
+      error = linkError;
+    } else {
+      const { error: signInError } = await supabase.auth.signInWithOAuth({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        provider: provider as any,
+        options: { redirectTo, scopes },
+      });
+      error = signInError;
+    }
+
     if (error) {
       const label = provider === "linkedin_oidc" ? "LinkedIn" : "X";
-      const msg = /not enabled|provider/i.test(error.message)
+      const raw = error.message || "";
+      const msg = /not enabled|provider/i.test(raw)
         ? `${label} sign-in isn't available yet. Ask the admin to enable the provider in Supabase.`
-        : error.message;
+        : /manual linking/i.test(raw)
+          ? `${label} linking requires "Manual linking" to be enabled in Supabase → Auth → Settings.`
+          : raw;
       setProviderError(msg);
     }
     setBusy(null);

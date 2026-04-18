@@ -5,10 +5,19 @@ export async function middleware(req: NextRequest) {
   let res = NextResponse.next({ request: req });
 
   const pathname = req.nextUrl.pathname;
-  const isPublicPath =
-    pathname === "/login" ||
-    pathname.startsWith("/auth/callback") ||
-    pathname.startsWith("/api/");
+
+  // CRITICAL: skip all Supabase calls on /auth/callback. The route handler
+  // owns the cookie/session for that request (it calls exchangeCodeForSession
+  // with the PKCE verifier cookie). Running getUser() here would pass the
+  // still-pre-exchange session through refreshSession, which can rotate or
+  // drop the verifier cookie mid-flight and surface as "OAuth state not
+  // found" on the second leg of the redirect. Let the callback run on its
+  // own, untouched.
+  if (pathname.startsWith("/auth/callback")) {
+    return res;
+  }
+
+  const isPublicPath = pathname === "/login" || pathname.startsWith("/api/");
 
   // If Supabase isn't configured (e.g. fresh local checkout) don't block —
   // surface env errors in the UI instead of trapping the user on /login.
@@ -22,14 +31,18 @@ export async function middleware(req: NextRequest) {
         getAll() {
           return req.cookies.getAll();
         },
+        // Mirror cookies onto BOTH the request and the response, matching
+        // the @supabase/ssr Next.js reference implementation. This keeps
+        // the rest of the middleware chain (and the server component render
+        // that follows) in sync with any refreshed session cookies.
         setAll(cookiesToSet) {
-          for (const { name, value } of cookiesToSet) {
-            req.cookies.set(name, value);
-          }
+          cookiesToSet.forEach(({ name, value, options }) => {
+            req.cookies.set({ name, value, ...options });
+          });
           res = NextResponse.next({ request: req });
-          for (const { name, value, options } of cookiesToSet) {
-            res.cookies.set(name, value, options);
-          }
+          cookiesToSet.forEach(({ name, value, options }) => {
+            res.cookies.set({ name, value, ...options });
+          });
         },
       },
     }
