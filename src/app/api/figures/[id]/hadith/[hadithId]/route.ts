@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 import { isUuid } from "@/lib/utils";
 
 export const runtime = "nodejs";
@@ -13,7 +13,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
   const body = await req.json().catch(() => null);
   const relevanceNote: string | null = body?.relevance_note ?? null;
-  const db = getSupabaseServer();
+  const db = createClient();
   const { error } = await db
     .from("figure_hadith_refs")
     .update({ relevance_note: relevanceNote })
@@ -29,7 +29,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (!isUuid(params.id) || !isUuid(params.hadithId)) {
     return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
   }
-  const db = getSupabaseServer();
+  const db = createClient();
   const { error } = await db
     .from("figure_hadith_refs")
     .delete()

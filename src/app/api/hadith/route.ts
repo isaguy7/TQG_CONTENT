@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 import { canonicalizeSunnahUrl, referenceFromUrl } from "@/lib/sunnah-search";
 
 export const runtime = "nodejs";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
  * Optional ?verified=true|false to filter.
  */
 export async function GET(req: NextRequest) {
-  const db = getSupabaseServer();
+  const db = createClient();
   const verified = req.nextUrl.searchParams.get("verified");
 
   let query = db
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const db = getSupabaseServer();
+  const db = createClient();
   const { data, error } = await db
     .from("hadith_verifications")
     .insert({

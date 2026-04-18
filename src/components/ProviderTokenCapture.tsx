@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase-browser";
+import { createClient } from "@/lib/supabase/client";
 
 /**
  * Listens for Supabase auth events and persists the OAuth provider token

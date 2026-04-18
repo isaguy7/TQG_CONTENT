@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +17,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Invalid params" }, { status: 400 });
   }
 
-  const db = getSupabaseServer();
+  const db = createClient();
   // (collection, hadith_number) is not unique — Sahih Muslim has thousands of
   // sub-narrations that share the same hadith_number. Return every match and
   // expose the first one for back-compat callers that expect `hadith`.

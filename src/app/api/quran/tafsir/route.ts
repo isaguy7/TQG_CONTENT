@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const db = getSupabaseServer();
+  const db = createClient();
 
   // Cache lookup
   const { data: cached } = await db

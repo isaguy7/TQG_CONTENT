@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const db = getSupabaseServer();
+  const db = createClient();
   const { data: figures, error } = await db
     .from("islamic_figures")
     .select(

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   const auth = await requireUser();
   if ("response" in auth) return auth.response;
 
-  const db = getSupabaseServer();
+  const db = createClient();
   const status = req.nextUrl.searchParams.get("status");
   const deleted = req.nextUrl.searchParams.get("deleted");
   const limit = Number(req.nextUrl.searchParams.get("limit") ?? "") || null;
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const db = getSupabaseServer();
+  const db = createClient();
   const { data, error } = await db
     .from("posts")
     .insert({

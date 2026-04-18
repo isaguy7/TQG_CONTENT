@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 import { getUserProfile } from "@/lib/user-profile";
 
 export const runtime = "nodejs";
@@ -30,7 +30,7 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const db = getSupabaseServer();
+  const db = createClient();
   const { data: profiles } = await db
     .from("user_profiles")
     .select("*")

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth";
 import type { FigureContext } from "@/lib/system-prompt";
 import { runAssistantMessage } from "@/lib/claude-api";
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing 'message'" }, { status: 400 });
   }
 
-  const db = getSupabaseServer();
+  const db = createClient();
   let figure: FigureContext | null = null;
   let hadith: HadithContext[] = [];
   let platform: string | null = null;

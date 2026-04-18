@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -102,7 +102,7 @@ const CATALOG: Omit<Suggestion, "key">[] = [
 ];
 
 export async function GET() {
-  const db = getSupabaseServer();
+  const db = createClient();
 
   // Only return suggestions that have Quran data imported; otherwise flag
   // them so the UI can nudge the user toward the importer.

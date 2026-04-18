@@ -1,4 +1,4 @@
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 
 export type OAuthPlatform = "linkedin" | "x";
 export type OAuthAccountType = "personal" | "organization";
@@ -30,7 +30,7 @@ export async function getConnection(
   platform: OAuthPlatform,
   accountType: OAuthAccountType = "personal"
 ): Promise<OAuthConnection | null> {
-  const db = getSupabaseServer();
+  const db = createClient();
   const { data } = await db
     .from("oauth_connections")
     .select("*")
@@ -51,7 +51,7 @@ export async function getOrgConnection(
   platform: OAuthPlatform,
   accountId: string
 ): Promise<OAuthConnection | null> {
-  const db = getSupabaseServer();
+  const db = createClient();
   const { data } = await db
     .from("oauth_connections")
     .select("*")
@@ -66,7 +66,7 @@ export async function getOrgConnection(
 export async function listConnections(
   userId: string
 ): Promise<OAuthConnection[]> {
-  const db = getSupabaseServer();
+  const db = createClient();
   const { data } = await db
     .from("oauth_connections")
     .select("*")
@@ -82,7 +82,7 @@ export async function markConnectionStatus(
   id: string,
   status: OAuthConnection["status"]
 ): Promise<void> {
-  const db = getSupabaseServer();
+  const db = createClient();
   await db
     .from("oauth_connections")
     .update({ status, updated_at: new Date().toISOString() })
@@ -98,7 +98,7 @@ export async function revokeConnection(
   userId: string,
   platform: OAuthPlatform
 ): Promise<void> {
-  const db = getSupabaseServer();
+  const db = createClient();
   await db
     .from("oauth_connections")
     .update({ status: "revoked", updated_at: new Date().toISOString() })
@@ -112,7 +112,7 @@ export async function revokeConnection(
  * personal connection active.
  */
 export async function revokeConnectionById(id: string): Promise<void> {
-  const db = getSupabaseServer();
+  const db = createClient();
   await db
     .from("oauth_connections")
     .update({ status: "revoked", updated_at: new Date().toISOString() })

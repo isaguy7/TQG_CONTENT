@@ -12,7 +12,7 @@ import { ProviderTokenCapture } from "@/components/ProviderTokenCapture";
 import { TypefullyAutoSync } from "@/components/TypefullyAutoSync";
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
-import { getCurrentUser } from "@/lib/supabase-server";
+import { getCurrentUser } from "@/lib/supabase/server";
 import { listConnections } from "@/lib/oauth-connections";
 
 export const dynamic = "force-dynamic";

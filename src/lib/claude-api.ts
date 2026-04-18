@@ -8,7 +8,7 @@
  * - Every call is logged to api_usage; we enforce API_MONTHLY_CAP before
  *   calling out, and refuse if the current month's spend is >= the cap.
  */
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 import {
   PERSONAL_VOICE_RULES,
   TQG_VOICE_RULES,
@@ -109,7 +109,7 @@ function estimateCost(
 }
 
 async function currentMonthSpend(userId: string | null): Promise<number> {
-  const db = getSupabaseServer();
+  const db = createClient();
   const start = new Date();
   start.setUTCDate(1);
   start.setUTCHours(0, 0, 0, 0);
@@ -135,7 +135,7 @@ async function logUsage(row: {
   postId?: string | null;
   userId?: string | null;
 }): Promise<void> {
-  const db = getSupabaseServer();
+  const db = createClient();
   await db.from("api_usage").insert({
     feature: row.feature,
     model: row.model,
@@ -551,7 +551,7 @@ Return JSON ONLY:
 export async function getUsageBreakdown(
   userId: string | null
 ): Promise<UsageBreakdown> {
-  const db = getSupabaseServer();
+  const db = createClient();
   const start = new Date();
   start.setUTCDate(1);
   start.setUTCHours(0, 0, 0, 0);

@@ -5,7 +5,7 @@ import {
   linkedinToX,
   linkedinToInstagram,
 } from "@/lib/platform-convert";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
   if (body.post_id) {
     const successful = drafts.filter((d) => d.available && d.draftId);
     if (successful.length > 0) {
-      const db = getSupabaseServer();
+      const db = createClient();
       const { data: existing } = await db
         .from("posts")
         .select("performance")

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   if ("response" in auth) return auth.response;
 
   const status = req.nextUrl.searchParams.get("status");
-  const db = getSupabaseServer();
+  const db = createClient();
   let query = db
     .from("clip_batch")
     .select("id,name,status,created_at,processed_at,results,error")

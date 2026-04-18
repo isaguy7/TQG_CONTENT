@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth";
 import { recordPublished } from "@/lib/gap-alerts";
 import { postToLinkedIn } from "@/lib/linkedin-api";
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No items to publish" }, { status: 400 });
   }
 
-  const db = getSupabaseServer();
+  const db = createClient();
 
   // Verify ownership before doing anything destructive.
   const { data: post } = await db

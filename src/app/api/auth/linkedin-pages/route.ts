@@ -4,7 +4,7 @@ import {
   getConnection,
   markConnectionStatus,
 } from "@/lib/oauth-connections";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -85,7 +85,7 @@ export async function GET() {
   }
 
   const data = (await res.json().catch(() => ({}))) as AclResponse;
-  const db = getSupabaseServer();
+  const db = createClient();
   const { data: existingRows } = await db
     .from("oauth_connections")
     .select("id,account_id,status")
@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const db = getSupabaseServer();
+  const db = createClient();
   const { error } = await db.from("oauth_connections").upsert(
     {
       user_id: auth.user.id,

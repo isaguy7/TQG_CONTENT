@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
-import { getCurrentUser } from "@/lib/supabase-server";
+import { getCurrentUser } from "@/lib/supabase/server";
 
 /**
  * Returns the current authenticated user, or a 401 NextResponse to be

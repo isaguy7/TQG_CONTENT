@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     ? Math.max(0, Math.min(50, Math.trunc(limitRaw)))
     : 20;
 
-  const db = getSupabaseServer();
+  const db = createClient();
 
   const base = (headOnly = false) => {
     let qb = db
