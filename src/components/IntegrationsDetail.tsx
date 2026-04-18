@@ -16,6 +16,14 @@ type IntegrationsPayload = {
   };
 };
 
+type EnvPayload = {
+  hosted: boolean;
+  gpu: boolean;
+  ffmpeg: boolean;
+  ytdlp: boolean;
+  mode: "cloud" | "local";
+};
+
 function Row({
   label,
   connected,
@@ -69,12 +77,17 @@ function Row({
 
 export function IntegrationsDetail() {
   const [data, setData] = useState<IntegrationsPayload | null>(null);
+  const [env, setEnv] = useState<EnvPayload | null>(null);
 
   useEffect(() => {
     fetch("/api/settings/integrations", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then(setData)
       .catch(() => setData(null));
+    fetch("/api/environment", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setEnv)
+      .catch(() => setEnv(null));
   }, []);
 
   if (!data) {
@@ -134,26 +147,16 @@ export function IntegrationsDetail() {
         connected={!!i.pexels?.connected}
         envVar="PEXELS_API_KEY"
       />
-      <Row
-        label={
-          i.typefully?.connected
-            ? "LinkedIn (via Typefully)"
-            : "LinkedIn"
-        }
-        connected={
-          !!i.linkedin?.connected || !!i.typefully?.connected
-        }
-        envVar={
-          i.typefully?.connected
-            ? "TYPEFULLY_API_KEY (Typefully publishes to LinkedIn)"
-            : "LINKEDIN_ACCESS_TOKEN"
-        }
-        details={
-          i.typefully?.connected
-            ? undefined
-            : [["OAuth ready", i.linkedin?.oauth_ready ? "yes" : "no"]]
-        }
-      />
+      {!i.typefully?.connected ? (
+        <Row
+          label="LinkedIn"
+          connected={!!i.linkedin?.connected}
+          envVar="LINKEDIN_ACCESS_TOKEN"
+          details={[
+            ["OAuth ready", i.linkedin?.oauth_ready ? "yes" : "no"],
+          ]}
+        />
+      ) : null}
       <Row
         label="Meta (Instagram / Facebook)"
         connected={!!i.meta?.connected}
@@ -163,13 +166,49 @@ export function IntegrationsDetail() {
       {i.whisperx ? (
         <Row
           label="WhisperX (transcription)"
-          connected={true}
-          details={[
-            ["Model", i.whisperx.model],
-            ["Device", i.whisperx.device],
-            ["Batch size", String(i.whisperx.batchSize)],
-          ]}
+          connected={env ? !env.hosted : true}
+          details={
+            env?.hosted
+              ? [
+                  [
+                    "Runtime",
+                    "hosted — local GPU required, skipped",
+                  ],
+                ]
+              : [
+                  ["Model", i.whisperx.model],
+                  ["Device", i.whisperx.device],
+                  ["Batch size", String(i.whisperx.batchSize)],
+                ]
+          }
         />
+      ) : null}
+      {env ? (
+        <>
+          <Row
+            label="yt-dlp (video download)"
+            connected={env.ytdlp}
+            envVar={
+              env.hosted
+                ? "Not available on Vercel — local Studio only"
+                : "YTDLP_BIN · YTDLP_USE_PYTHON"
+            }
+          />
+          <Row
+            label="ffmpeg (audio / clip render)"
+            connected={env.ffmpeg}
+            envVar={
+              env.hosted
+                ? "Not available on Vercel — local Studio only"
+                : "FFMPEG_BIN"
+            }
+          />
+          <Row
+            label="GPU (NVENC / CUDA)"
+            connected={env.gpu}
+            details={[["Mode", env.mode]]}
+          />
+        </>
       ) : null}
     </div>
   );
