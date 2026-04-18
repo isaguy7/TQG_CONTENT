@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { PageShell } from "@/components/PageShell";
 import { cn } from "@/lib/utils";
 import {
@@ -67,7 +68,11 @@ export default function NewClipBatchPage() {
   const [clips, setClips] = useState<ClipDraft[]>([]);
   const [rendering, setRendering] = useState(false);
   const [renderResult, setRenderResult] = useState<{
-    results: Array<{ output: string; ok: boolean; error?: string }>;
+    results?: Array<{ output: string; ok: boolean; error?: string }>;
+    queued?: boolean;
+    batch_id?: string | null;
+    status?: string;
+    error?: string;
   } | null>(null);
   const [batchName, setBatchName] = useState<string>("");
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -259,7 +264,17 @@ export default function NewClipBatchPage() {
         body: JSON.stringify(body),
       });
       const j = await r.json();
-      setRenderResult(j);
+      if (!r.ok) {
+        setRenderResult({ error: j.error || `HTTP ${r.status}` });
+        return;
+      }
+      setRenderResult({
+        results: j.results,
+        queued: j.queued,
+        batch_id: j.batch_id,
+        status: j.status,
+        error: j.error,
+      });
     } catch (err) {
       setRenderResult({
         results: [{ output: "", ok: false, error: (err as Error).message }],
@@ -696,23 +711,22 @@ export default function NewClipBatchPage() {
             </button>
             <button
               onClick={render}
-              disabled={!canRender || rendering || hosted}
-              title={
-                hosted
-                  ? "Local rendering required — run the Studio on your machine to render"
-                  : undefined
-              }
+              disabled={!canRender || rendering}
               className="px-3 py-1.5 rounded text-[12px] bg-primary text-primary-foreground hover:bg-primary-hover disabled:opacity-40"
             >
-              {rendering ? "Rendering…" : "Render all"}
+              {rendering
+                ? hosted
+                  ? "Queuing…"
+                  : "Rendering…"
+                : hosted
+                  ? "Add to render queue"
+                  : "Render all"}
             </button>
           </div>
           {hosted ? (
-            <div className="text-[12px] text-amber-200/90 bg-amber-500/[0.08] border border-amber-400/25 rounded px-2 py-1.5 mb-2 leading-relaxed">
-              Local rendering required. On Vercel you can still plan clips,
-              pick backgrounds, and export captions — run the Studio locally
-              (<code className="font-mono">npm run dev</code>) to render the
-              final MP4s.
+            <div className="text-[12px] text-emerald-100 bg-emerald-500/[0.08] border border-emerald-400/25 rounded px-2 py-1.5 mb-2 leading-relaxed">
+              Added batches are queued. Open <code className="font-mono">/queue</code> on your
+              local Studio to process them with ffmpeg/GPU.
             </div>
           ) : null}
           {!canRender ? (
@@ -721,7 +735,21 @@ export default function NewClipBatchPage() {
               duration within its platform&apos;s max.
             </div>
           ) : null}
-          {renderResult ? (
+          {renderResult?.queued ? (
+            <div className="rounded-lg border border-emerald-400/25 bg-emerald-500/[0.08] text-emerald-100 text-[12px] px-3 py-2">
+              Added to render queue. Process on your local Studio in the{" "}
+              <Link href="/queue" className="underline underline-offset-2">
+                queue page
+              </Link>
+              .
+            </div>
+          ) : null}
+          {renderResult?.error ? (
+            <div className="rounded-lg border border-danger/40 bg-danger/[0.08] text-danger text-[12px] px-3 py-2">
+              {renderResult.error}
+            </div>
+          ) : null}
+          {renderResult?.results ? (
             <ul className="space-y-1">
               {renderResult.results.map((r, i) => (
                 <li

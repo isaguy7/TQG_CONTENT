@@ -17,6 +17,19 @@ function formatNumber(n: number): string {
 }
 
 export function RecentPostsList({ posts }: { posts: RecentPost[] }) {
+  if (posts.length === 0) {
+    return (
+      <div className="rounded-2xl bg-white/[0.05] border border-white/[0.08] p-5 backdrop-blur-md text-center">
+        <div className="text-[13px] text-white/85 mb-1">
+          Your workspace is clear.
+        </div>
+        <div className="text-[12px] text-white/55">
+          Capture an idea or publish a post to see performance here.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
       <div className="flex items-center justify-between mb-3">

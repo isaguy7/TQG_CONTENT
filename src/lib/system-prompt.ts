@@ -7,25 +7,37 @@ import {
 } from "@/lib/platform-rules";
 
 /**
- * The TQG writing rules distilled from 250+ turns of content iteration.
- * Exported to clipboard for Claude.ai drafting alongside transcript +
- * figure context. The app NEVER generates hadith book+number references.
+ * Distilled voice rules for two modes: Isa's personal tone and the
+ * house TQG voice. Exported for Claude prompts and the in-app assistant.
+ * The app NEVER generates hadith book+number references.
  */
-export const WRITING_RULES = `=== WRITING RULES ===
-- Drop into a scene. No setup. Earn context later.
-- Hooks determine reach. Favour Tier 1 (curiosity / provocative / scene)
-  over Tier 2 (descriptive / factual).
-- One thread per post. Reflections woven subtly, never announced.
-- Never narrate irony. Never summarise the takeaway. Don't wrap up.
-- Use the Prophet's (SAW) actual words, not paraphrases. One hit is enough.
-- Sensory over generic. Fragments for effect. Active subjects.
-- No em dashes. No AI phrases. Short paragraphs. Lowercase is deliberate.
+export const PERSONAL_VOICE_RULES = `=== PERSONAL VOICE ===
+- Speak as Isa. Close, direct, and lived-in — not brand polish.
+- Drop into a scene; let tension hang. Earn context later.
+- Hooks first. Tier 1 (curiosity / provocative / scene) beats Tier 2.
+- Fewer morals. Never wrap with "the lesson is...".
+- Use the Prophet's (SAW) actual words when cited. No paraphrase.
+- Sensory over generic. Verbs active. Fragments welcome.
+- No em dashes. No "delve", "realm", "tapestry" style AI sludge.
+- Lowercase is deliberate. CTA at most once.
+- NEVER generate hadith reference numbers. Say "verify on sunnah.com."
+- The draft is a starting point — Isa will rewrite heavily.`;
+
+export const TQG_VOICE_RULES = `=== TQG VOICE ===
+- Studio tone: confident craft, cinematic hooks, minimal exposition.
+- Drop readers straight into motion; reveal context only as needed.
+- Hooks rule reach. Tier 1 (curiosity / provocative / scene) over Tier 2.
+- One thread per post. No summaries, no moral-of-the-story wrap-ups.
+- Use the Prophet's (SAW) words verbatim when cited. One clean hit is enough.
+- Sensory details beat abstractions. Prefer fragments and active subjects.
+- No em dashes. No AI filler phrases. Paragraphs stay short.
 - Islamic references woven naturally. One CTA max.
-- Fade endings out. Cut biographical wrap-ups after strong endings.
-- Posts read like talking to a friend.
-- NEVER generate hadith reference numbers. Describe the hadith and say
-  'verify on sunnah.com.'
-- The draft is a starting point. Isa always edits heavily.`;
+- Fade endings out; avoid biographical bows after a strong close.
+- NEVER generate hadith reference numbers. Say "verify on sunnah.com."
+- Assume a human editor will still tune the draft.`;
+
+// Back-compat for existing imports until callers are updated.
+export const WRITING_RULES = TQG_VOICE_RULES;
 
 export type FigureContext = {
   nameEn: string;
@@ -42,6 +54,7 @@ export type SystemPromptInput = {
   topic?: string | null;
   instruction?: string;
   platform?: PlatformId | string | null;
+  voice?: "personal" | "tqg";
 };
 
 function defaultInstruction(platformLabel: string): string {
@@ -52,7 +65,9 @@ character). Then I'll pick one and we'll iterate on the draft.`;
 }
 
 export function buildSystemPrompt(input: SystemPromptInput): string {
-  const parts: string[] = [WRITING_RULES];
+  const parts: string[] = [
+    input.voice === "personal" ? PERSONAL_VOICE_RULES : TQG_VOICE_RULES,
+  ];
 
   const platformLabel = input.platform
     ? getPlatform(input.platform).label

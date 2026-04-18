@@ -9,7 +9,11 @@
  *   calling out, and refuse if the current month's spend is >= the cap.
  */
 import { getSupabaseServer } from "@/lib/supabase";
-import { WRITING_RULES, type FigureContext } from "@/lib/system-prompt";
+import {
+  PERSONAL_VOICE_RULES,
+  TQG_VOICE_RULES,
+  type FigureContext,
+} from "@/lib/system-prompt";
 import {
   getPlatform,
   platformPromptBlock,
@@ -34,6 +38,7 @@ export type Hook = {
 type Available<T> = { available: true } & T;
 type Unavailable = { available: false; reason: string };
 type Result<T> = Available<T> | Unavailable;
+type ChatTurn = { role: "user" | "assistant"; content: string };
 
 export type HookResult = Result<{
   hooks: Hook[];
@@ -50,6 +55,13 @@ export type ConvertResult = Result<{
 export type SlopResult = Result<{
   issues: string[];
   score: number;
+  tokens: number;
+  cost: number;
+}>;
+
+export type AssistantResult = Result<{
+  reply: string;
+  imageQuery?: string | null;
   tokens: number;
   cost: number;
 }>;
@@ -115,7 +127,7 @@ async function currentMonthSpend(userId: string | null): Promise<number> {
 }
 
 async function logUsage(row: {
-  feature: "hooks" | "convert" | "suggest" | "slop_check";
+  feature: "hooks" | "convert" | "suggest" | "slop_check" | "assistant";
   model: string;
   inputTokens: number;
   outputTokens: number;
@@ -142,11 +154,15 @@ type MessagesResponse = {
 
 async function callMessages(
   system: string,
-  user: string,
+  user: string | ChatTurn[],
   maxTokens: number = 2048
 ): Promise<MessagesResponse> {
   const key = apiKey();
   if (!key) throw new Error("ANTHROPIC_API_KEY missing");
+  const messages =
+    typeof user === "string"
+      ? [{ role: "user" as const, content: user }]
+      : user.map((m) => ({ role: m.role, content: m.content }));
   const res = await fetch(API_URL, {
     method: "POST",
     headers: {
@@ -158,7 +174,7 @@ async function callMessages(
       model: model(),
       max_tokens: maxTokens,
       system,
-      messages: [{ role: "user", content: user }],
+      messages,
     }),
   });
   if (!res.ok) {
@@ -220,7 +236,7 @@ export async function generateHooks(input: {
     };
   }
 
-  const system = `${WRITING_RULES}
+  const system = `${TQG_VOICE_RULES}
 
 You are writing social-media hooks for "The Quran Group" content studio.
 Hooks are first-line openings that determine reach. Tier 1 hooks
@@ -304,7 +320,7 @@ export async function convertPlatform(input: {
 
   const fromCfg = getPlatform(input.fromPlatform);
   const toCfg = getPlatform(input.toPlatform);
-  const system = `${WRITING_RULES}
+  const system = `${TQG_VOICE_RULES}
 
 You convert finished social posts between platforms while preserving
 voice. You NEVER invent new information. Output the converted post
@@ -395,6 +411,138 @@ No markdown, no prose.`;
     available: true,
     issues,
     score,
+    tokens: inputTokens + outputTokens,
+    cost,
+  };
+}
+
+export async function runAssistantMessage(input: {
+  userMessage: string;
+  voice?: "personal" | "tqg";
+  draft?: string | null;
+  platform?: PlatformId | string | null;
+  topic?: string | null;
+  figure?: FigureContext | null;
+  hadith?: Array<{
+    reference_text: string;
+    narrator?: string | null;
+    translation_en?: string | null;
+    arabic_text?: string | null;
+  }>;
+  history?: ChatTurn[];
+  postId?: string | null;
+  userId?: string | null;
+}): Promise<AssistantResult> {
+  if (!apiKey()) return { available: false, reason: "no_api_key" };
+  const cap = await guardCap(input.userId || null);
+  if (cap.over) {
+    return {
+      available: false,
+      reason: `monthly_cap_reached (${cap.spent.toFixed(2)} / ${cap.cap})`,
+    };
+  }
+
+  const voiceRules =
+    input.voice === "personal" ? PERSONAL_VOICE_RULES : TQG_VOICE_RULES;
+
+  const contextParts: string[] = [];
+  if (input.platform) {
+    contextParts.push(
+      `=== PLATFORM ===\n${platformPromptBlock(getPlatform(input.platform))}`
+    );
+  }
+  if (input.figure) {
+    const f = input.figure;
+    const lines: string[] = [];
+    lines.push(`Name: ${f.nameEn}${f.nameAr ? ` (${f.nameAr})` : ""}`);
+    if (f.title) lines.push(`Title: ${f.title}`);
+    if (f.bioShort) lines.push(`Bio: ${f.bioShort}`);
+    if (f.themes?.length) lines.push(`Themes: ${f.themes.join(", ")}`);
+    if (f.notableEvents) {
+      lines.push(`Notable events: ${JSON.stringify(f.notableEvents)}`);
+    }
+    contextParts.push(`=== FIGURE CONTEXT ===\n${lines.join("\n")}`);
+  }
+  if (input.topic) {
+    contextParts.push(`=== TOPIC ===\n${input.topic}`);
+  }
+  if (input.hadith?.length) {
+    const trimmed = input.hadith.slice(0, 4);
+    contextParts.push(
+      `=== HADITH CONTEXT ===\n${trimmed
+        .map((h, i) => {
+          const parts: string[] = [];
+          parts.push(`${i + 1}. ${h.reference_text}`);
+          if (h.narrator) parts.push(`Narrator: ${h.narrator}`);
+          if (h.translation_en) parts.push(`EN: ${h.translation_en}`);
+          return parts.join("\n");
+        })
+        .join("\n\n")}`
+    );
+  }
+  const draft = (input.draft || "").trim();
+  if (draft) {
+    contextParts.push(
+      `=== CURRENT DRAFT ===\n${draft.slice(0, 2200)}${
+        draft.length > 2200 ? "\n[truncated]" : ""
+      }`
+    );
+  }
+
+  const system = `${voiceRules}
+
+You are the dual-voice assistant for TQG Studio. Keep tone aligned to the active voice and respect Islamic authenticity.
+If the user asks for visuals or "image suggestions", include an "image_query" string with search keywords.
+Reply concisely. Avoid hadith book/number references — say "verify on sunnah.com."
+
+Return JSON ONLY:
+{
+  "reply": "markdown-friendly answer to show in chat",
+  "image_query": "optional search keywords when visuals are requested"
+}`;
+
+  const promptBlocks = [
+    `USER REQUEST:\n${input.userMessage.trim()}`,
+    contextParts.length > 0 ? `CONTEXT:\n${contextParts.join("\n\n")}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  const history = (input.history || []).map((h) => ({
+    role: h.role,
+    content: h.content,
+  }));
+
+  const resp = await callMessages(
+    system,
+    [...history, { role: "user", content: promptBlocks }],
+    2048
+  );
+  const text = extractText(resp);
+  const parsed = tryParseJson<{ reply?: string; image_query?: string }>(text);
+  const reply = parsed?.reply?.trim() || text;
+  const imageQuery =
+    typeof parsed?.image_query === "string"
+      ? parsed.image_query.trim()
+      : null;
+
+  const inputTokens = resp.usage?.input_tokens || 0;
+  const outputTokens = resp.usage?.output_tokens || 0;
+  const cost = estimateCost(model(), inputTokens, outputTokens);
+  await logUsage({
+    feature: "assistant",
+    model: model(),
+    inputTokens,
+    outputTokens,
+    costUsd: cost,
+    postId: input.postId || null,
+    userId: input.userId || null,
+  });
+
+  return {
+    available: true,
+    reply,
+    imageQuery,
     tokens: inputTokens + outputTokens,
     cost,
   };

@@ -35,6 +35,14 @@ export default function ClipsPage() {
             Note: final ffmpeg/NVENC rendering runs on your local Studio. On
             Vercel you can still plan batches, match ayahs, search Pexels, and
             export captions — only the &quot;Render&quot; step requires local.
+            Use &ldquo;Add to render queue&rdquo; then process locally on the{" "}
+            <a
+              href="/queue"
+              className="underline underline-offset-2 text-white/80 hover:text-white"
+            >
+              queue page
+            </a>
+            .
           </div>
         ) : null}
 

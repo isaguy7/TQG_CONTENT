@@ -14,11 +14,11 @@
     --muted-foreground-dim: 0 0% 30%;  /* rgba(255,255,255,.3) */
 
     /* Accent — TQG green */
-    --primary: 123 57% 24%;            /* #1B5E20 */
-    --primary-hover: 123 45% 34%;      /* #2E7D32 */
-    --primary-foreground: 123 41% 85%; /* #c8e6c9 */
-    --primary-bright: 123 43% 49%;     /* #4CAF50 — text on dark */
-    --primary-soft: 123 38% 74%;       /* #a5d6a7 */
+    --primary: 161 74% 32%;            /* emerald/turquoise gradient base */
+    --primary-hover: 164 67% 38%;      /* brighter hover */
+    --primary-foreground: 160 72% 88%; /* readable on dark */
+    --primary-bright: 162 70% 52%;     /* accent text */
+    --primary-soft: 160 55% 72%;       /* subtle surfaces */
 
     /* Status */
     --status-ready: 123 45% 34%;       /* #2E7D32 */
@@ -40,6 +40,9 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+    background-image:
+      radial-gradient(circle at 18% 12%, rgba(16, 185, 129, 0.08), transparent 32%),
+      radial-gradient(circle at 82% 0%, rgba(34, 211, 238, 0.08), transparent 30%);
   }
   /* Default border for any element that uses the border utility */
   *,
