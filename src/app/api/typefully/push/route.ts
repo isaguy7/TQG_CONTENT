@@ -6,6 +6,7 @@ import {
   linkedinToInstagram,
 } from "@/lib/platform-convert";
 import { getSupabaseServer } from "@/lib/supabase";
+import { requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +14,9 @@ export const dynamic = "force-dynamic";
 type Mode = "single" | "multi" | "clip";
 
 export async function POST(req: NextRequest) {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
   let body: {
     post_id?: string;
     mode?: Mode;
@@ -71,6 +75,7 @@ export async function POST(req: NextRequest) {
         fromPlatform: "linkedin",
         toPlatform: "x",
         postId: body.post_id || null,
+        userId: auth.user.id,
       });
       variants.push({
         platform: "x",
@@ -81,6 +86,7 @@ export async function POST(req: NextRequest) {
         fromPlatform: "linkedin",
         toPlatform: "instagram",
         postId: body.post_id || null,
+        userId: auth.user.id,
       });
       variants.push({
         platform: "instagram",
@@ -123,6 +129,7 @@ export async function POST(req: NextRequest) {
         .from("posts")
         .select("performance")
         .eq("id", body.post_id)
+        .eq("user_id", auth.user.id)
         .maybeSingle();
       const prevPerf =
         (existing?.performance as Record<string, unknown>) || {};
@@ -146,7 +153,8 @@ export async function POST(req: NextRequest) {
           updated_at: new Date().toISOString(),
           performance: mergedPerf,
         })
-        .eq("id", body.post_id);
+        .eq("id", body.post_id)
+        .eq("user_id", auth.user.id);
     }
   }
 

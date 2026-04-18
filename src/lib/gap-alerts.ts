@@ -13,6 +13,7 @@ export type GapAlert = {
 
 export type WeeklyCalendar = {
   week_start: string;
+  user_id?: string | null;
   linkedin_originals_target: number;
   linkedin_originals_actual: number;
   tqg_reposts_target: number;
@@ -33,20 +34,20 @@ export function currentWeekStart(d: Date = new Date()): string {
   return copy.toISOString().slice(0, 10);
 }
 
-export async function ensureCurrentWeek(): Promise<WeeklyCalendar> {
+export async function ensureCurrentWeek(userId: string): Promise<WeeklyCalendar> {
   const db = getSupabaseServer();
   const week = currentWeekStart();
-  // Upsert with ignoreDuplicates eliminates the check-then-insert race.
   await db
     .from("content_calendar")
-    .upsert({ week_start: week }, {
-      onConflict: "week_start",
-      ignoreDuplicates: true,
-    });
+    .upsert(
+      { week_start: week, user_id: userId },
+      { onConflict: "user_id,week_start", ignoreDuplicates: true }
+    );
   const { data, error } = await db
     .from("content_calendar")
     .select("*")
     .eq("week_start", week)
+    .eq("user_id", userId)
     .single();
   if (error || !data) {
     throw new Error(
@@ -56,9 +57,9 @@ export async function ensureCurrentWeek(): Promise<WeeklyCalendar> {
   return data as WeeklyCalendar;
 }
 
-export async function computeGapAlerts(): Promise<GapAlert[]> {
+export async function computeGapAlerts(userId: string): Promise<GapAlert[]> {
   const db = getSupabaseServer();
-  await ensureCurrentWeek();
+  await ensureCurrentWeek(userId);
   const alerts: GapAlert[] = [];
 
   // Informational suggestion only: surface figures we haven't posted about
@@ -83,12 +84,12 @@ export async function recordPublished(postId: string): Promise<void> {
   const db = getSupabaseServer();
   const { data: post } = await db
     .from("posts")
-    .select("id,platform,figure_id,topic_tags")
+    .select("id,platform,figure_id,topic_tags,user_id")
     .eq("id", postId)
     .maybeSingle();
-  if (!post) return;
+  if (!post || !post.user_id) return;
 
-  const calendar = await ensureCurrentWeek();
+  const calendar = await ensureCurrentWeek(post.user_id);
   const patch: Record<string, unknown> = {};
   if (post.platform === "linkedin") {
     patch.linkedin_originals_actual = calendar.linkedin_originals_actual + 1;
@@ -132,6 +133,7 @@ export async function recordPublished(postId: string): Promise<void> {
     await db
       .from("content_calendar")
       .update(patch)
-      .eq("week_start", calendar.week_start);
+      .eq("week_start", calendar.week_start)
+      .eq("user_id", post.user_id);
   }
 }

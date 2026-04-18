@@ -96,15 +96,17 @@ function estimateCost(
   );
 }
 
-async function currentMonthSpend(): Promise<number> {
+async function currentMonthSpend(userId: string | null): Promise<number> {
   const db = getSupabaseServer();
   const start = new Date();
   start.setUTCDate(1);
   start.setUTCHours(0, 0, 0, 0);
-  const { data, error } = await db
+  let q = db
     .from("api_usage")
     .select("estimated_cost_usd")
     .gte("created_at", start.toISOString());
+  if (userId) q = q.eq("user_id", userId);
+  const { data, error } = await q;
   if (error) return 0;
   return (data || []).reduce(
     (sum, r) => sum + Number(r.estimated_cost_usd || 0),
@@ -119,6 +121,7 @@ async function logUsage(row: {
   outputTokens: number;
   costUsd: number;
   postId?: string | null;
+  userId?: string | null;
 }): Promise<void> {
   const db = getSupabaseServer();
   await db.from("api_usage").insert({
@@ -128,6 +131,7 @@ async function logUsage(row: {
     output_tokens: row.outputTokens,
     estimated_cost_usd: row.costUsd,
     post_id: row.postId || null,
+    user_id: row.userId || null,
   });
 }
 
@@ -187,12 +191,12 @@ function tryParseJson<T>(text: string): T | null {
   }
 }
 
-async function guardCap(): Promise<{
+async function guardCap(userId: string | null): Promise<{
   spent: number;
   cap: number;
   over: boolean;
 }> {
-  const spent = await currentMonthSpend();
+  const spent = await currentMonthSpend(userId);
   const cap = capUsd();
   return { spent, cap, over: spent >= cap };
 }
@@ -203,11 +207,12 @@ export async function generateHooks(input: {
   transcript?: string | null;
   platform?: PlatformId | string | null;
   postId?: string | null;
+  userId?: string | null;
 }): Promise<HookResult> {
   if (!apiKey()) {
     return { available: false, reason: "no_api_key" };
   }
-  const cap = await guardCap();
+  const cap = await guardCap(input.userId || null);
   if (cap.over) {
     return {
       available: false,
@@ -270,6 +275,7 @@ Return 10-15 hooks. No markdown. No commentary.`;
     outputTokens,
     costUsd: cost,
     postId: input.postId || null,
+    userId: input.userId || null,
   });
 
   return {
@@ -285,9 +291,10 @@ export async function convertPlatform(input: {
   fromPlatform: PlatformId | string;
   toPlatform: PlatformId | string;
   postId?: string | null;
+  userId?: string | null;
 }): Promise<ConvertResult> {
   if (!apiKey()) return { available: false, reason: "no_api_key" };
-  const cap = await guardCap();
+  const cap = await guardCap(input.userId || null);
   if (cap.over) {
     return {
       available: false,
@@ -326,6 +333,7 @@ ${platformPromptBlock(toCfg)}`;
     outputTokens,
     costUsd: cost,
     postId: input.postId || null,
+    userId: input.userId || null,
   });
 
   return {
@@ -339,9 +347,10 @@ ${platformPromptBlock(toCfg)}`;
 export async function checkSlop(input: {
   content: string;
   postId?: string | null;
+  userId?: string | null;
 }): Promise<SlopResult> {
   if (!apiKey()) return { available: false, reason: "no_api_key" };
-  const cap = await guardCap();
+  const cap = await guardCap(input.userId || null);
   if (cap.over) {
     return {
       available: false,
@@ -379,6 +388,7 @@ No markdown, no prose.`;
     outputTokens,
     costUsd: cost,
     postId: input.postId || null,
+    userId: input.userId || null,
   });
 
   return {
@@ -390,19 +400,23 @@ No markdown, no prose.`;
   };
 }
 
-export async function getUsageBreakdown(): Promise<UsageBreakdown> {
+export async function getUsageBreakdown(
+  userId: string | null
+): Promise<UsageBreakdown> {
   const db = getSupabaseServer();
   const start = new Date();
   start.setUTCDate(1);
   start.setUTCHours(0, 0, 0, 0);
 
-  const { data } = await db
+  let q = db
     .from("api_usage")
     .select(
       "id,feature,model,input_tokens,output_tokens,estimated_cost_usd,created_at"
     )
     .gte("created_at", start.toISOString())
     .order("created_at", { ascending: false });
+  if (userId) q = q.eq("user_id", userId);
+  const { data } = await q;
 
   const rows = (data || []) as UsageBreakdown["recent"];
   const byFeature: Record<string, { count: number; cost: number }> = {};

@@ -2,11 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateHooks } from "@/lib/claude-api";
 import { getSupabaseServer } from "@/lib/supabase";
 import type { FigureContext } from "@/lib/system-prompt";
+import { requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
   let body: {
     post_id?: string;
     topic?: string | null;
@@ -30,6 +34,7 @@ export async function POST(req: NextRequest) {
       .from("posts")
       .select("title, platform, figure_id, transcript")
       .eq("id", body.post_id)
+      .eq("user_id", auth.user.id)
       .maybeSingle();
     if (post) {
       if (!platform) platform = post.platform;
@@ -62,6 +67,7 @@ export async function POST(req: NextRequest) {
       transcript: body.transcript || null,
       platform,
       postId: body.post_id || null,
+      userId: auth.user.id,
     });
     return NextResponse.json(result);
   } catch (err) {

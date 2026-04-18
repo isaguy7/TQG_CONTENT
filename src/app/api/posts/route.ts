@@ -1,16 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase";
+import { requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
   const db = getSupabaseServer();
   const status = req.nextUrl.searchParams.get("status");
   const deleted = req.nextUrl.searchParams.get("deleted");
   const limit = Number(req.nextUrl.searchParams.get("limit") ?? "") || null;
 
-  let query = db.from("posts").select("*");
+  let query = db.from("posts").select("*").eq("user_id", auth.user.id);
 
   if (deleted === "true") {
     query = query
@@ -36,6 +40,9 @@ export async function GET(req: NextRequest) {
  * Always create as idea/drafting, attach hadith, verify, then PATCH to ready.
  */
 export async function POST(req: NextRequest) {
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+
   let body: {
     title?: string;
     platform?: string;
@@ -61,6 +68,7 @@ export async function POST(req: NextRequest) {
       source_url: body.source_url || null,
       transcript: body.transcript || null,
       status: "idea",
+      user_id: auth.user.id,
     })
     .select()
     .single();
