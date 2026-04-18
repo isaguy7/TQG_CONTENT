@@ -8,10 +8,11 @@ import {
   type HadithRecord,
 } from "@/components/HadithPanel";
 import { QuranBrowser } from "@/components/QuranBrowser";
+import { TafsirBrowser } from "@/components/TafsirBrowser";
 import { cn } from "@/lib/utils";
 
 export default function HadithPage() {
-  const [tab, setTab] = useState<"hadith" | "quran">("hadith");
+  const [tab, setTab] = useState<"hadith" | "quran" | "tafsir">("hadith");
   const [hadith, setHadith] = useState<HadithRecord[]>([]);
   const [corpusCount, setCorpusCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,7 +64,7 @@ export default function HadithPage() {
   return (
     <PageShell
       title="References"
-      description="Hadith verification + Quran browsing"
+      description="Hadith corpus · Quran · Tafsir — the Islamic sources browser"
     >
       <div className="max-w-4xl">
         <div className="flex items-center gap-1 border-b border-white/[0.06] mb-5">
@@ -89,12 +90,27 @@ export default function HadithPage() {
           >
             Quran
           </button>
+          <button
+            onClick={() => setTab("tafsir")}
+            className={cn(
+              "px-4 py-2 text-[13px] border-b-2 -mb-px transition-colors",
+              tab === "tafsir"
+                ? "border-primary-bright text-white/90"
+                : "border-transparent text-white/50 hover:text-white/80"
+            )}
+          >
+            Tafsir
+          </button>
         </div>
       </div>
 
       {tab === "quran" ? (
         <div className="max-w-4xl">
           <QuranBrowser />
+        </div>
+      ) : tab === "tafsir" ? (
+        <div className="max-w-4xl">
+          <TafsirBrowser />
         </div>
       ) : (
       <div className="max-w-4xl space-y-6">
