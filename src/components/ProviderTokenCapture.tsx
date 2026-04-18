@@ -8,14 +8,11 @@ import { createClient } from "@/lib/supabase-browser";
  * Listens for Supabase auth events and persists the OAuth provider token
  * (LinkedIn / X) into our `oauth_connections` table via /api/auth/save-token.
  *
- * Why this lives on the client: Supabase only exposes `session.provider_token`
- * and `session.provider_refresh_token` in the browser-side session payload.
- * The server-side `exchangeCodeForSession` call (in /auth/callback) returns
- * null for those fields, so the capture has to happen here after the browser
- * hydrates the session post-redirect.
- *
- * Mount this in the Settings page (the standard post-OAuth `next`). It is a
- * no-op unless a fresh provider_token is present.
+ * Why this lives on the client: Supabase only surfaces `provider_token` /
+ * `provider_refresh_token` in the browser-side session payload, and only
+ * briefly — they fire on INITIAL_SESSION / SIGNED_IN right after the
+ * redirect-back, and may be stripped from subsequent getSession() calls.
+ * So we hook onAuthStateChange for the earliest opportunity.
  */
 export function ProviderTokenCapture({
   onSaved,
@@ -27,18 +24,50 @@ export function ProviderTokenCapture({
   useEffect(() => {
     const supabase = createClient();
 
-    const attemptSave = async (session: Session | null) => {
+    const summarise = (session: Session | null) => ({
+      hasSession: !!session,
+      provider_token: session?.provider_token
+        ? session.provider_token.slice(0, 10) + "…"
+        : null,
+      provider_refresh_token: !!session?.provider_refresh_token,
+      provider: session?.user?.app_metadata?.provider ?? null,
+      email: session?.user?.email ?? null,
+    });
+
+    const attemptSave = async (
+      session: Session | null,
+      trigger: string
+    ) => {
+      console.log(
+        `[ProviderTokenCapture] ${trigger} session:`,
+        JSON.stringify(summarise(session))
+      );
       if (!session) return;
       const providerToken = session.provider_token;
-      if (!providerToken) return;
+      if (!providerToken) {
+        console.log(
+          `[ProviderTokenCapture] ${trigger} — no provider_token, skipping save`
+        );
+        return;
+      }
 
       const user = session.user;
       const provider = (user.app_metadata?.provider as string | undefined) || "";
-      if (!provider) return;
+      if (!provider) {
+        console.log(
+          `[ProviderTokenCapture] ${trigger} — no provider in app_metadata, skipping`
+        );
+        return;
+      }
 
-      // De-dupe — the same token shouldn't be saved on every mount.
+      // De-dupe — the same token shouldn't be saved on every event fire.
       const key = `${provider}:${providerToken.slice(0, 24)}`;
-      if (savedKey.current === key) return;
+      if (savedKey.current === key) {
+        console.log(
+          `[ProviderTokenCapture] ${trigger} — token already saved this session, skipping`
+        );
+        return;
+      }
       savedKey.current = key;
 
       try {
@@ -57,6 +86,9 @@ export function ProviderTokenCapture({
           const body = (await res.json()) as {
             platform?: "linkedin" | "x";
           };
+          console.log(
+            `[ProviderTokenCapture] ${trigger} — saved token for platform=${body.platform}`
+          );
           if (body.platform) {
             onSaved?.(body.platform);
             if (typeof window !== "undefined") {
@@ -68,23 +100,35 @@ export function ProviderTokenCapture({
             }
           }
         } else {
+          const text = await res.text();
           console.error(
-            "[ProviderTokenCapture] save-token failed",
-            await res.text()
+            `[ProviderTokenCapture] ${trigger} — save-token HTTP ${res.status}`,
+            text
           );
+          // Allow a retry on next event if this one failed.
+          savedKey.current = null;
         }
       } catch (err) {
-        console.error("[ProviderTokenCapture] save-token error", err);
+        console.error(
+          `[ProviderTokenCapture] ${trigger} — save-token error`,
+          err
+        );
+        savedKey.current = null;
       }
     };
 
-    // Check the current session on mount — handles the redirect case where
-    // SIGNED_IN may have fired before this listener attached.
-    supabase.auth.getSession().then(({ data }) => attemptSave(data.session));
-
+    // INITIAL_SESSION fires exactly once when the listener attaches with
+    // whatever session the browser currently has. With Supabase PKCE, the
+    // provider_token is only present on this event (and SIGNED_IN); it can
+    // be missing from subsequent getSession() results.
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-        attemptSave(session);
+      console.log(`[ProviderTokenCapture] event=${event}`);
+      if (
+        event === "INITIAL_SESSION" ||
+        event === "SIGNED_IN" ||
+        event === "TOKEN_REFRESHED"
+      ) {
+        attemptSave(session, event);
       }
     });
 
