@@ -3,7 +3,8 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient as createSbClient } from "@supabase/supabase-js";
 
 const ROLE_COOKIE = "tqg_role";
-const ROLE_COOKIE_TTL_SEC = 60 * 60; // 1 hour — balances staleness vs DB load.
+const ACTIVE_ORG_COOKIE = "tqg_active_org";
+const PROFILE_COOKIE_TTL_SEC = 60 * 60; // 1 hour — balances staleness vs DB load.
 
 export async function middleware(req: NextRequest) {
   let res = NextResponse.next({ request: req });
@@ -21,10 +22,13 @@ export async function middleware(req: NextRequest) {
     return res;
   }
 
-  const isPublicPath =
+  const isAuthPath =
     pathname === "/login" ||
-    pathname === "/pending-approval" ||
-    pathname.startsWith("/api/");
+    pathname === "/signup" ||
+    pathname === "/pending-approval";
+  const isOnboardingPath = pathname === "/onboarding";
+  const isApiPath = pathname.startsWith("/api/");
+  const isPublicPath = isAuthPath || isApiPath;
 
   // If Supabase isn't configured (e.g. fresh local checkout) don't block —
   // surface env errors in the UI instead of trapping the user on /login.
@@ -59,20 +63,27 @@ export async function middleware(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Unauthenticated: force to /login (preserve intended destination).
   if (!user && !isPublicPath) {
     const redirectUrl = new URL("/login", req.url);
     redirectUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(redirectUrl);
   }
 
-  // Authenticated users: gate on approval status. Signed-in users on
-  // /login are allowed (they may be re-authing). Anything else requires
-  // role ∈ {admin,member}; 'pending' goes to /pending-approval.
-  if (user && !isPublicPath) {
-    // Read cached role cookie. Empty or missing → re-query the profiles
-    // table through the service-role client so RLS doesn't hide the row.
+  // Authenticated but visiting /login or /signup: kick back to home.
+  if (user && (pathname === "/login" || pathname === "/signup")) {
+    return NextResponse.redirect(new URL("/", req.url));
+  }
+
+  // Authenticated: enforce role + active-org gate on non-public, non-API,
+  // non-onboarding routes.
+  if (user && !isPublicPath && !isOnboardingPath) {
     let role = req.cookies.get(ROLE_COOKIE)?.value || null;
-    if (!role) {
+    let activeOrg =
+      req.cookies.get(ACTIVE_ORG_COOKIE)?.value || null;
+    const needProfileRefresh = !role;
+
+    if (needProfileRefresh) {
       const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
       if (serviceKey) {
         try {
@@ -83,31 +94,52 @@ export async function middleware(req: NextRequest) {
           );
           const { data } = await admin
             .from("user_profiles")
-            .select("role")
+            .select("role, active_organization_id")
             .eq("user_id", user.id)
             .maybeSingle();
-          role = (data as { role?: string } | null)?.role || "pending";
+          const row =
+            (data as {
+              role?: string;
+              active_organization_id?: string | null;
+            } | null) ?? null;
+          role = row?.role || "pending";
+          activeOrg = row?.active_organization_id || "";
         } catch {
-          // If the table doesn't exist yet (migration not applied) treat
-          // all signed-in users as members so we don't lock anyone out.
+          // If user_profiles isn't queryable (migration not applied) treat
+          // as member with no active org so /onboarding catches them.
           role = "member";
+          activeOrg = "";
         }
         res.cookies.set(ROLE_COOKIE, role, {
-          maxAge: ROLE_COOKIE_TTL_SEC,
+          maxAge: PROFILE_COOKIE_TTL_SEC,
+          httpOnly: true,
+          sameSite: "lax",
+          path: "/",
+        });
+        res.cookies.set(ACTIVE_ORG_COOKIE, activeOrg ?? "", {
+          maxAge: PROFILE_COOKIE_TTL_SEC,
           httpOnly: true,
           sameSite: "lax",
           path: "/",
         });
       } else {
-        // Service role missing: fail open on role so local dev without the
-        // admin key still works.
+        // Service role missing: fail open so local dev without the admin
+        // key still works.
         role = "member";
+        activeOrg = activeOrg ?? "";
       }
     }
 
+    // Platform-level gate: pending/rejected users bounce to the waiting
+    // page regardless of org state.
     if (role === "pending" || role === "rejected") {
-      const redirectUrl = new URL("/pending-approval", req.url);
-      return NextResponse.redirect(redirectUrl);
+      return NextResponse.redirect(new URL("/pending-approval", req.url));
+    }
+
+    // Org-level gate: approved users without an active org go to
+    // onboarding to create or pick one.
+    if (!activeOrg) {
+      return NextResponse.redirect(new URL("/onboarding", req.url));
     }
   }
 
