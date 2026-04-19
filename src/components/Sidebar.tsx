@@ -40,11 +40,11 @@ const nav: Array<{ href: string; label: string; icon: LucideIcon }> = [
 
 type PostStatus =
   | "idea"
-  | "drafting"
-  | "review"
-  | "ready"
+  | "draft"
   | "scheduled"
-  | "published";
+  | "published"
+  | "failed"
+  | "archived";
 
 type RecentPost = {
   id: string;
@@ -58,20 +58,20 @@ type RecentPost = {
 
 const statusDot: Record<PostStatus, string> = {
   idea: "bg-white/25",
-  drafting: "bg-amber-400",
-  review: "bg-amber-400",
-  ready: "bg-emerald-400",
+  draft: "bg-amber-400",
   scheduled: "bg-sky-400",
   published: "bg-sky-400",
+  failed: "bg-red-400",
+  archived: "bg-white/20",
 };
 
 const statusLabel: Record<PostStatus, string> = {
   idea: "idea",
-  drafting: "drafting",
-  review: "review",
-  ready: "ready",
+  draft: "draft",
   scheduled: "scheduled",
   published: "published",
+  failed: "failed",
+  archived: "archived",
 };
 
 export function Sidebar() {
@@ -168,14 +168,11 @@ export function Sidebar() {
                 className={cn(
                   "group relative flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200",
                   active
-                    ? "bg-emerald-500/15 text-emerald-50 ring-1 ring-emerald-400/60 shadow-[0_8px_24px_rgba(16,185,129,0.25)]"
+                    ? "bg-[#1B5E20]/15 text-white ring-1 ring-[#1B5E20]/60 shadow-[0_0_14px_rgba(27,94,32,0.5)]"
                     : "text-white/60 hover:text-white hover:bg-white/[0.06]"
                 )}
               >
                 <Icon className="w-5 h-5" />
-                {active ? (
-                  <span className="absolute left-1 w-1.5 h-7 rounded-full bg-gradient-to-b from-emerald-400 to-cyan-400" />
-                ) : null}
                 <span className="sr-only">{label}</span>
                 <span className="pointer-events-none absolute left-14 z-20 rounded-lg bg-white/10 backdrop-blur-md px-2 py-1 text-[11px] text-white/85 opacity-0 shadow-xl shadow-black/30 transition-opacity duration-150 group-hover:opacity-100">
                   {label}

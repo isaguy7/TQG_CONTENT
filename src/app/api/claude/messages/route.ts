@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
   if (body.post_id) {
     const { data: post, error } = await db
       .from("posts")
-      .select("title,platform,figure_id,final_content")
+      .select("title,platform,platforms,figure_id,final_content")
       .eq("id", body.post_id)
       .eq("user_id", auth.user.id)
       .maybeSingle();
@@ -56,7 +56,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
     if (post) {
-      platform = post.platform;
+      const arr = post.platforms as string[] | null | undefined;
+      platform = arr?.[0] ?? (post.platform as string | null | undefined) ?? null;
       topic = post.title;
       if (!draft) draft = post.final_content;
       if (post.figure_id) {

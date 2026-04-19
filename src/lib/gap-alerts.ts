@@ -84,16 +84,22 @@ export async function recordPublished(postId: string): Promise<void> {
   const db = createClient();
   const { data: post } = await db
     .from("posts")
-    .select("id,platform,figure_id,topic_tags,user_id")
+    .select("id,platform,platforms,figure_id,topic_tags,user_id")
     .eq("id", postId)
     .maybeSingle();
   if (!post || !post.user_id) return;
 
   const calendar = await ensureCurrentWeek(post.user_id);
   const patch: Record<string, unknown> = {};
-  if (post.platform === "linkedin") {
+  // Prefer platforms[] (new source of truth); fall back to singular
+  // platform column until it's dropped in M2.
+  const platforms: string[] =
+    (post.platforms as string[] | null | undefined) ??
+    (post.platform ? [post.platform as string] : []);
+  if (platforms.includes("linkedin")) {
     patch.linkedin_originals_actual = calendar.linkedin_originals_actual + 1;
-  } else if (post.platform === "x") {
+  }
+  if (platforms.includes("x")) {
     patch.x_posts_actual = calendar.x_posts_actual + 1;
   }
 

@@ -3,15 +3,11 @@ import "server-only";
 import { createClient } from "@/lib/supabase/admin";
 
 /**
- * Thrown when a caller tries to transition a post to status='ready' while
- * it has unverified hadith references. Mirrors the DB trigger installed
- * by migration 20260416000002_publish_gate.sql.
- *
- * Two layers of enforcement exist on purpose:
- *   - Node side (this file): clean API error, known error shape for UI.
- *   - DB trigger: backstop that fires even if the API is bypassed. Never
- *     remove the trigger. If this Node check is ever wrong, the DB
- *     rejects the update anyway.
+ * Thrown when a caller tries to schedule/publish a post while it has
+ * unverified hadith references. Historical DB trigger was dropped in
+ * `20260417175934_drop_publish_gate`; V10 §7 will re-introduce the
+ * trigger under the UNVERIFIED enforcement model. Until then this
+ * Node-side check is the only enforcement and has no active call sites.
  */
 export class PublishGateError extends Error {
   readonly code = "PUBLISH_GATE";
@@ -31,8 +27,8 @@ export class PublishGateError extends Error {
 
 /**
  * Throws PublishGateError if the given post has any hadith refs with
- * verified=false. Safe to call before any mutation that sets
- * posts.status='ready'.
+ * verified=false. Safe to call before any mutation that schedules or
+ * publishes a post.
  */
 export async function assertPublishable(postId: string): Promise<void> {
   const db = createClient();

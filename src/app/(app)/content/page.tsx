@@ -9,17 +9,18 @@ import { cn } from "@/lib/utils";
 
 type PostStatus =
   | "idea"
-  | "drafting"
-  | "review"
-  | "ready"
+  | "draft"
   | "scheduled"
-  | "published";
+  | "published"
+  | "failed"
+  | "archived";
 
 type PostRow = {
   id: string;
   title: string | null;
   status: PostStatus;
   platform: string;
+  platforms?: string[] | null;
   updated_at: string;
   deleted_at: string | null;
   labels?: string[] | null;
@@ -28,20 +29,20 @@ type PostRow = {
 
 const statusBorder: Record<PostStatus, string> = {
   idea: "border-l-2 border-white/10",
-  drafting: "border-l-2 border-status-drafting",
-  review: "border-l-2 border-status-drafting",
-  ready: "border-l-2 border-status-ready",
+  draft: "border-l-2 border-status-drafting",
   scheduled: "border-l-2 border-status-published",
   published: "border-l-2 border-status-published",
+  failed: "border-l-2 border-danger/60",
+  archived: "border-l-2 border-white/5",
 };
 
 type Toast = { message: string; undo?: () => void; id: number } | null;
 
+// Simplified 4-stage pipeline for V10 — kanban rewrite in §4 restructures
+// around the new status model (failed/archived aren't pipeline stages).
 const PIPELINE: PostStatus[] = [
   "idea",
-  "drafting",
-  "review",
-  "ready",
+  "draft",
   "scheduled",
   "published",
 ];
@@ -174,7 +175,7 @@ export default function ContentListPage() {
       acc[p.status] = (acc[p.status] ?? 0) + 1;
       return acc;
     },
-    { idea: 0, drafting: 0, review: 0, ready: 0, scheduled: 0, published: 0 }
+    { idea: 0, draft: 0, scheduled: 0, published: 0, failed: 0, archived: 0 }
   );
   const filtered = stageFilter
     ? posts.filter((p) => p.status === stageFilter)
@@ -420,9 +421,7 @@ function PostRowItem({
 function StatusBadge({ status }: { status: PostStatus }) {
   const map: Record<PostStatus, { label: string; tone: string }> = {
     idea: { label: "idea", tone: "bg-white/[0.05] text-white/45" },
-    drafting: { label: "drafting", tone: "bg-warning/[0.15] text-warning" },
-    review: { label: "review", tone: "bg-warning/[0.15] text-warning" },
-    ready: { label: "ready", tone: "bg-primary/[0.2] text-primary-bright" },
+    draft: { label: "draft", tone: "bg-warning/[0.15] text-warning" },
     scheduled: {
       label: "scheduled",
       tone: "bg-status-published/[0.2] text-status-published",
@@ -431,6 +430,8 @@ function StatusBadge({ status }: { status: PostStatus }) {
       label: "published",
       tone: "bg-status-published/[0.2] text-status-published",
     },
+    failed: { label: "failed", tone: "bg-danger/[0.15] text-danger" },
+    archived: { label: "archived", tone: "bg-white/[0.03] text-white/30" },
   };
   const { label, tone } = map[status];
   return (
@@ -447,20 +448,20 @@ function StatusBadge({ status }: { status: PostStatus }) {
 
 const STAGE_LABEL: Record<PostStatus, string> = {
   idea: "Idea",
-  drafting: "Drafting",
-  review: "Review",
-  ready: "Ready",
+  draft: "Draft",
   scheduled: "Scheduled",
   published: "Published",
+  failed: "Failed",
+  archived: "Archived",
 };
 
 const STAGE_DOT: Record<PostStatus, string> = {
   idea: "bg-white/35",
-  drafting: "bg-warning",
-  review: "bg-warning",
-  ready: "bg-primary-bright",
+  draft: "bg-warning",
   scheduled: "bg-status-published",
   published: "bg-status-published",
+  failed: "bg-danger",
+  archived: "bg-white/20",
 };
 
 function StatusPipeline({

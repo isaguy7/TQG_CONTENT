@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PageShell } from "@/components/PageShell";
+import { SafeList, ListSkeleton } from "@/components/shared/SafeList";
 import { cn } from "@/lib/utils";
 
 type Figure = {
@@ -117,16 +118,23 @@ export default function FiguresPage() {
         </div>
 
         {figures === null ? (
-          <div className="text-[13px] text-white/40">Loading figures…</div>
-        ) : filtered.length === 0 ? (
-          <div className="text-[13px] text-white/40">No figures match.</div>
+          <ListSkeleton />
         ) : (
           <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {filtered.map((f) => {
-              const needsRefs =
-                f.hadith_ref_count === 0 && f.quran_ref_count === 0;
-              return (
-                <li key={f.id}>
+            <SafeList
+              data={filtered}
+              empty={
+                <li className="col-span-full text-[13px] text-white/40">
+                  No figures match.
+                </li>
+              }
+              keyFn={(f) => f.id}
+            >
+              {(f) => {
+                const needsRefs =
+                  f.hadith_ref_count === 0 && f.quran_ref_count === 0;
+                return (
+                  <li key={f.id}>
                   <Link
                     href={`/figures/${f.id}`}
                     className="card-interactive block rounded-xl bg-white/[0.03] border border-white/[0.06] overflow-hidden shadow-lg shadow-black/10"
@@ -204,8 +212,9 @@ export default function FiguresPage() {
                     </div>
                   </Link>
                 </li>
-              );
-            })}
+                );
+              }}
+            </SafeList>
           </ul>
         )}
       </div>

@@ -32,12 +32,15 @@ export async function POST(req: NextRequest) {
     const db = createClient();
     const { data: post } = await db
       .from("posts")
-      .select("title, platform, figure_id, transcript")
+      .select("title, platform, platforms, figure_id, transcript")
       .eq("id", body.post_id)
       .eq("user_id", auth.user.id)
       .maybeSingle();
     if (post) {
-      if (!platform) platform = post.platform;
+      if (!platform) {
+        const arr = post.platforms as string[] | null | undefined;
+        platform = arr?.[0] ?? (post.platform as string | null | undefined) ?? null;
+      }
       if (!topic) topic = post.title;
       if (!body.transcript && post.transcript) body.transcript = post.transcript;
       if (!figure && post.figure_id) {
