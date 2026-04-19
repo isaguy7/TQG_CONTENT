@@ -7,6 +7,46 @@ resolution path.
 Complements [`CLEANUP_DEBT.md`](./CLEANUP_DEBT.md) (schema + infrastructure
 debt). This file is for code-structure debt.
 
+## Archived until M3
+
+Deleted 2026-04-19 to fix Vercel 250 MB serverless function limit. Three
+clip/transcribe routes were bundling `.next/cache/webpack` (~251 MB)
+into the deployed function and blowing past the limit. Video processing
+is explicitly M3 scope per `V10_M1_Plan.md`.
+
+Recoverable from git history at commit **`d039aee`** (HEAD immediately
+before deletion on branch `claude/implement-writer-app-tieYL`).
+
+Removed files:
+- `src/app/api/clips/*` (7 routes: assets, queue, queue/process, render,
+  download-stock, stock-videos, suggestions)
+- `src/app/api/transcribe/route.ts`
+- `src/app/(app)/clips/page.tsx`, `src/app/(app)/clips/new/page.tsx`
+- `src/app/(app)/queue/page.tsx` (100% dependent on `/api/clips/queue*`)
+- `src/components/TranscribeWorkflow.tsx` (744 lines)
+- `src/components/StockBackgrounds.tsx` (only used by deleted clip pages)
+- `src/lib/captions.ts` (659 lines)
+
+Also edited:
+- `src/app/(app)/content/new/page.tsx` — removed "From a video URL"
+  section and `TranscribeWorkflow` import
+- `src/components/Sidebar.tsx` — removed `/clips` and `/queue` nav entries
+  (also dropped `Clapperboard` + `PlayCircle` icon imports)
+- `src/app/(app)/page.tsx` — removed "New clip batch" + "Transcribe video"
+  QuickLinks from the dashboard
+
+Not deleted (orphaned but harmless, tree-shaken from the bundle):
+- `src/lib/whisper.ts`, `src/lib/ffmpeg.ts`, `src/lib/ytdlp.ts`,
+  `src/lib/kill-tree.ts`, `src/lib/clip-renderer.ts`, `src/lib/clip-platforms.ts`,
+  `src/lib/clip-themes.ts`, `src/lib/pexels.ts`, `src/lib/subtitles.ts`,
+  `src/lib/transcript.ts`, `src/components/TranscriptViewer.tsx`
+- `src/lib/local-studio.ts` + `src/components/LocalStudio.tsx` — still
+  mounted in `/settings` as the local-render-tunnel URL input. Setting
+  is a no-op without the clip routes but the UI doesn't break.
+
+Restore path at M3: `git show d039aee:<path> > <path>` for each file.
+Or cherry-pick the inverse of the archival commit.
+
 ## Active debt
 
 ### Files over 500 lines
@@ -17,10 +57,7 @@ as their relevant sections land.
 
 | Lines | Path | Planned split in |
 |------:|------|------------------|
-|  774  | `src/app/(app)/clips/new/page.tsx` | M3 (clip creator rewrite) |
-|  744  | `src/components/TranscribeWorkflow.tsx` | M3 (clip creator rewrite) |
 |  675  | `src/app/(app)/content/[id]/page.tsx` | **§5 (Tiptap editor rewrite — full replace)** |
-|  659  | `src/lib/captions.ts` | M3 (clip creator rewrite) |
 |  595  | `src/components/FigureContextPanel.tsx` | §6 (figure library) |
 |  592  | `src/lib/claude-api.ts` | §9 (AI assistant full rebuild) |
 |  586  | `src/components/HadithPanel.tsx` | §7 (hadith system) |
@@ -47,8 +84,6 @@ its own sites.
 |------|-----:|-------|---------------------------|
 | `src/app/(app)/content/page.tsx` | 232, 254 | posts, deleted posts | §4 kanban |
 | `src/app/(app)/calendar/page.tsx` | 311, 362, 423 | grid cells, cell items, figures_covered | §13 calendar |
-| `src/app/(app)/queue/page.tsx` | 136, 186 | render batches, batch results | M3 clip creator |
-| `src/app/(app)/clips/new/page.tsx` | 368, 387, 491, 568, 665, 754 | recitations, platforms, matches, clips, backgrounds, results | M3 clip creator |
 | `src/app/(app)/content/[id]/page.tsx` | 440, 466, 611, 648 | format notes, platforms, attached hadith, available hadith | §5 editor rewrite |
 | `src/app/(app)/figures/[id]/page.tsx` | 179 | figure themes | §6 figure library |
 | `src/components/HadithPanel.tsx` | 182, 409, 430, 523 | search results × 3, corpus list | §7 hadith system |
@@ -70,9 +105,6 @@ its own sites.
 | `src/components/UserManagement.tsx` | 124 | users | §17 admin |
 | `src/components/AmbientSuggestions.tsx` | 156, 187 | hadith hits, quran hits | §7/§8 pickers |
 | `src/components/ImagePicker.tsx` | 150 | image search results | §5 editor |
-| `src/components/StockBackgrounds.tsx` | 234, 282 | quick flattened, results | M3 clip creator |
-
-Roughly 55 candidate sites across 26 files.
 
 **Not candidates** (excluded per §1 step 8 spec): `.map()` over static
 constants (platform lists, nav items, enum arrays), computed-always-present
@@ -97,17 +129,15 @@ the connection-status indicators in `ClaudeStatusCard`, `ClaudeUsage`,
 `PublishPanel` success rows, `SlopChecker` "no slop" state, and
 `TypefullyPush` "already pushed" badge.
 
-Active drift sites (60 occurrences across 17 files):
+Active drift sites:
 
 | File | Lines | Section that will repaint |
 |------|------:|---------------------------|
 | `src/app/(app)/calendar/page.tsx` | 234, 276 | §13 calendar |
-| `src/app/(app)/clips/new/page.tsx` | 727, 739, 760 | M3 clip creator |
 | `src/app/(app)/content/[id]/page.tsx` | 272, 280, 323 | §5 editor rewrite |
 | `src/app/(app)/figures/[id]/page.tsx` | 37 (sahabi tint) | §6 figure library |
 | `src/app/(app)/figures/page.tsx` | 33, 43 (sahabi tint) | §6 figure library |
 | `src/app/(app)/page.tsx` | 138 | §15 dashboard polish |
-| `src/app/(app)/queue/page.tsx` | 86, 95, 147, 161, 192 | M3 clip creator |
 | `src/app/(auth)/login/page.tsx` | 122 (info card) | §0 onboarding polish |
 | `src/components/AiAssistantDrawer.tsx` | 130, 132, 178, 190, 201, 206, 223, 243, 274, 308, 314 | §9 AI assistant (full rebuild) |
 | `src/components/FigureContextPanel.tsx` | 459, 519, 527 | §6 figure library |

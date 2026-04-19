@@ -163,8 +163,6 @@ export default async function DashboardPage() {
             <div className="section-label mb-3">Quick create</div>
             <div className="space-y-1.5">
               <QuickLink href="/content/new" label="New post" />
-              <QuickLink href="/clips/new" label="New clip batch" />
-              <QuickLink href="/content/new?video=1" label="Transcribe video" />
             </div>
           </div>
         </div>
