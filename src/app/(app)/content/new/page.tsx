@@ -4,7 +4,6 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { PageShell } from "@/components/PageShell";
-import { TranscribeWorkflow } from "@/components/TranscribeWorkflow";
 
 export default function NewPostPage() {
   return (
@@ -76,14 +75,9 @@ function NewPostInner() {
   return (
     <PageShell
       title="New post"
-      description="Start from a video URL (transcribe) or blank (Phase 2+)"
+      description="Start a blank draft — video transcription returns in M3."
     >
       <div className="max-w-3xl space-y-6">
-        <section>
-          <div className="section-label mb-3">From a video URL</div>
-          <TranscribeWorkflow />
-        </section>
-
         <section className="rounded-lg bg-white/[0.02] border border-white/[0.06] p-6">
           <div className="section-label mb-2">Start blank</div>
           <p className="text-[13px] text-white/60 leading-relaxed">
