@@ -28,13 +28,15 @@ Or paste each `.sql` file into the Supabase SQL editor in order.
 | `content_revisions`    | all   | Generic version history (replaces `posts.draft_versions`).   |
 | `api_usage`            | v2    | Optional Claude API cost tracking.                           |
 
-## Publish gate
+## Publish gate (historical)
 
-`20260416000002_publish_gate.sql` installs a trigger that blocks
-`posts.status='ready'` whenever any linked hadith in `post_hadith_refs` has
-`verified=false`. This is the DB half of the safety kernel described in the
-refined spec. The Node-side `lib/publish-gate.ts` (Phase 2) wraps the same
-check so API callers get a clean error before the round-trip.
+An early DB trigger in `20260416000002_publish_gate.sql` blocked
+`posts.status='ready'` whenever any linked hadith had `verified=false`.
+That trigger was dropped in `20260417175934_drop_publish_gate`, and the
+`'ready'` status itself was removed in V10 M1 §2
+(`20260419111246_v10_post_status_and_columns`).
 
-Never drop this trigger. Never mark a hadith verified without actually
-checking sunnah.com.
+V10 M1 §7 will re-introduce UNVERIFIED enforcement with a new trigger
+that blocks transitions into `scheduled`/`published` when any linked
+hadith is unverified. The Node-side `src/lib/publish-gate.ts` has no
+active call sites until §7 lands.

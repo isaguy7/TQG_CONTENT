@@ -59,7 +59,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   let body: {
     title?: string;
     final_content?: string | null;
-    status?: "idea" | "drafting" | "review" | "ready" | "scheduled" | "published";
+    status?: "idea" | "draft" | "scheduled" | "published" | "failed" | "archived";
     platform?: string;
     figure_id?: string | null;
     hook_selected?: string | null;

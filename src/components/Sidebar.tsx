@@ -40,11 +40,11 @@ const nav: Array<{ href: string; label: string; icon: LucideIcon }> = [
 
 type PostStatus =
   | "idea"
-  | "drafting"
-  | "review"
-  | "ready"
+  | "draft"
   | "scheduled"
-  | "published";
+  | "published"
+  | "failed"
+  | "archived";
 
 type RecentPost = {
   id: string;
@@ -58,20 +58,20 @@ type RecentPost = {
 
 const statusDot: Record<PostStatus, string> = {
   idea: "bg-white/25",
-  drafting: "bg-amber-400",
-  review: "bg-amber-400",
-  ready: "bg-emerald-400",
+  draft: "bg-amber-400",
   scheduled: "bg-sky-400",
   published: "bg-sky-400",
+  failed: "bg-red-400",
+  archived: "bg-white/20",
 };
 
 const statusLabel: Record<PostStatus, string> = {
   idea: "idea",
-  drafting: "drafting",
-  review: "review",
-  ready: "ready",
+  draft: "draft",
   scheduled: "scheduled",
   published: "published",
+  failed: "failed",
+  archived: "archived",
 };
 
 export function Sidebar() {

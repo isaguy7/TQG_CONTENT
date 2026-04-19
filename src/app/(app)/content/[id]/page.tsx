@@ -27,11 +27,11 @@ import { AiAssistantDrawer } from "@/components/AiAssistantDrawer";
 
 type PostStatus =
   | "idea"
-  | "drafting"
-  | "review"
-  | "ready"
+  | "draft"
   | "scheduled"
-  | "published";
+  | "published"
+  | "failed"
+  | "archived";
 
 type Post = {
   id: string;
@@ -39,6 +39,7 @@ type Post = {
   final_content: string | null;
   status: PostStatus;
   platform: string;
+  platforms?: string[] | null;
   figure_id: string | null;
   hook_selected: string | null;
   image_url: string | null;
@@ -183,7 +184,7 @@ export default function PostEditorPage() {
           }
         : null;
       const prompt = buildSystemPrompt({
-        platform: post.platform,
+        platform: post.platforms?.[0] ?? post.platform,
         figure: figureCtx,
         topic: post.title,
       });
@@ -210,7 +211,7 @@ export default function PostEditorPage() {
     setPost({ ...post, image_url, image_rationale });
   };
 
-  const moveToDrafts = () => save({ status: "drafting" as PostStatus });
+  const moveToDrafts = () => save({ status: "draft" as PostStatus });
   const moveToIdeas = () => save({ status: "idea" as PostStatus });
 
   const attachedIds = useMemo(() => new Set(attached.map((h) => h.id)), [attached]);
@@ -478,11 +479,11 @@ export default function PostEditorPage() {
                 className="bg-white/[0.03] border border-white/[0.08] rounded px-2 py-1 text-white/85"
               >
                 <option value="idea">idea</option>
-                <option value="drafting">drafting</option>
-                <option value="review">review</option>
-                <option value="ready">ready</option>
+                <option value="draft">draft</option>
                 <option value="scheduled">scheduled</option>
                 <option value="published">published</option>
+                <option value="failed">failed</option>
+                <option value="archived">archived</option>
               </select>
             </label>
             <div className="flex-1" />
@@ -491,7 +492,7 @@ export default function PostEditorPage() {
           <div className="mt-4 pt-3 border-t border-white/[0.06]">
             <ConvertPreviews
               content={draft}
-              fromPlatform={post.platform}
+              fromPlatform={post.platforms?.[0] ?? post.platform}
               postId={post.id}
             />
           </div>
@@ -568,7 +569,7 @@ export default function PostEditorPage() {
         <PublishPanel
           postId={post.id}
           content={draft}
-          platform={post.platform}
+          platform={post.platforms?.[0] ?? post.platform}
           imageUrl={post.image_url}
           onPublished={() => {
             // Refresh the post so the new status / scheduled_for shows up.
