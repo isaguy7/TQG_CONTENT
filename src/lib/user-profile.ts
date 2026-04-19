@@ -9,6 +9,7 @@ export type UserProfile = {
   approved_at: string | null;
   approved_by: string | null;
   local_tunnel_url: string | null;
+  active_organization_id: string | null;
   created_at: string;
   updated_at: string;
 };
