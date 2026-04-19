@@ -7,6 +7,8 @@ import Link from "@tiptap/extension-link";
 import CharacterCount from "@tiptap/extension-character-count";
 import type { JSONContent } from "@tiptap/core";
 import type { TiptapJson } from "@/types/post";
+import { MentionFigure } from "../extensions/MentionFigure";
+import { HashtagMark } from "../extensions/HashtagMark";
 
 /**
  * Minimum subset of a Post the editor needs. Declared here (rather than
@@ -84,6 +86,12 @@ export function usePostEditor({
       // crossed. Blocking input at the limit is unfriendly when the
       // user is iterating across multiple platforms with different caps.
       CharacterCount.configure({ limit: null }),
+      // @-trigger popover → islamic_figures search. Selection inserts
+      // a TQG-green pill; plain-text export renders "@{figure name}".
+      MentionFigure,
+      // #word mark — regex-based input rule, no suggestion. Muted zinc
+      // color in the editor; plain-text export keeps the # prefix.
+      HashtagMark,
     ],
     content: resolveInitialContent(post),
     immediatelyRender: false,
