@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase-browser";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { LinkedInPages } from "@/components/LinkedInPages";
 

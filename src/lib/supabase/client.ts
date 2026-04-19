@@ -1,3 +1,8 @@
+// sync, returns browser client with PKCE
+//
+// Session-aware Supabase client for use in Client Components. Singleton so
+// repeated calls across the app return the same instance. PKCE flow matches
+// the server-side exchange performed in /auth/callback.
 import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -20,8 +25,6 @@ export function createClient(): SupabaseClient {
       // reports "OAuth state not found". Disable the browser's in-URL
       // auto-detection so the server is the sole exchanger.
       detectSessionInUrl: false,
-      // Explicit PKCE — matches the server-side createServerClient flow
-      // used by /auth/callback and middleware.
       flowType: "pkce",
       persistSession: true,
       autoRefreshToken: true,

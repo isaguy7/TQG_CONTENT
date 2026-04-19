@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const db = getSupabaseServer();
+  const db = createClient();
   const cutoff = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
 
   const { data: never } = await db

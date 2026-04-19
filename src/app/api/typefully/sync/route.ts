@@ -5,7 +5,7 @@ import {
   typefullyAvailable,
   type TypefullyDraft,
 } from "@/lib/typefully";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
@@ -51,7 +51,7 @@ export async function POST() {
   const published = pubRes.available ? (pubRes.drafts as ExtendedDraft[]) : [];
   const scheduled = schRes.available ? (schRes.drafts as ExtendedDraft[]) : [];
 
-  const db = getSupabaseServer();
+  const db = createClient();
   const { data: existingPosts } = await db
     .from("posts")
     .select("id,title,final_content,status,platform,performance,published_at")

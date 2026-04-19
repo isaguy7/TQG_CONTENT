@@ -14,7 +14,7 @@
  *      normalized Levenshtein distance on the actual strings.
  */
 
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 
 export type QuranAyah = {
   id: string;
@@ -72,7 +72,7 @@ async function loadCorpus(): Promise<void> {
   if (corpusCache && trigramIndex) return;
   if (loadingPromise) return loadingPromise;
   loadingPromise = (async () => {
-    const db = getSupabaseServer();
+    const db = createClient();
     const { data, error } = await db
       .from("quran_cache")
       .select("id,surah,ayah,verse_key,text_uthmani,normalized,translation_en")
@@ -194,7 +194,7 @@ export async function getAyah(
   surah: number,
   ayah: number
 ): Promise<QuranAyah | null> {
-  const db = getSupabaseServer();
+  const db = createClient();
   const { data, error } = await db
     .from("quran_cache")
     .select("id,surah,ayah,verse_key,text_uthmani,normalized,translation_en")
@@ -209,7 +209,7 @@ export async function searchEnglishTranslation(
   query: string,
   limit: number = 20
 ): Promise<QuranAyah[]> {
-  const db = getSupabaseServer();
+  const db = createClient();
   const escaped = query.replace(/[%_]/g, (m) => `\\${m}`);
   const { data, error } = await db
     .from("quran_cache")

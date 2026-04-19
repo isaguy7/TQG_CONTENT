@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureCurrentWeek, computeGapAlerts } from "@/lib/gap-alerts";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 import {
   listRecentlyScheduled,
   typefullyAvailable,
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
   const calendar = await ensureCurrentWeek(auth.user.id);
   const alerts = await computeGapAlerts(auth.user.id);
 
-  const db = getSupabaseServer();
+  const db = createClient();
 
   // Compute the month window. Default to the current month so existing
   // callers (no ?month=) keep working, now returning the whole month.

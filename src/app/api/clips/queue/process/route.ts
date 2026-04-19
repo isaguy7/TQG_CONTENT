@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import path from "node:path";
 import { mkdir, stat } from "node:fs/promises";
 import { requireUser } from "@/lib/auth";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 import { ffmpegAvailable, isHosted } from "@/lib/environment";
 import { getClipPlatform, type ClipPlatformId } from "@/lib/clip-platforms";
 
@@ -68,7 +68,7 @@ export async function POST() {
     );
   }
 
-  const db = getSupabaseServer();
+  const db = createClient();
   const { data: batches, error } = await db
     .from("clip_batch")
     .select("id,name,payload")

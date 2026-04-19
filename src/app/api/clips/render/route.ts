@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
 import { stat, mkdir } from "node:fs/promises";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 import { getClipPlatform, type ClipPlatformId } from "@/lib/clip-platforms";
 import { ffmpegAvailable, isHosted } from "@/lib/environment";
 import { requireUser } from "@/lib/auth";
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const db = getSupabaseServer();
+  const db = createClient();
   const hosted = isHosted();
   if (!hosted && !ffmpegAvailable()) {
     return NextResponse.json(

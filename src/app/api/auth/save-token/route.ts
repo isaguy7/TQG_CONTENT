@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
       ? ["openid", "profile", "email", "w_member_social"]
       : ["tweet.read", "tweet.write", "users.read", "offline.access"];
 
-  const db = getSupabaseServer();
+  const db = createClient();
   // OAuth callbacks always represent the signed-in member — LinkedIn Pages
   // are added as separate rows via /api/auth/linkedin-pages.
   //

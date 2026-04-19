@@ -1,4 +1,4 @@
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 
 export type UserRole = "pending" | "member" | "admin" | "rejected";
 
@@ -25,7 +25,7 @@ export type UserProfile = {
 export async function getUserProfile(
   userId: string
 ): Promise<UserProfile | null> {
-  const db = getSupabaseServer();
+  const db = createClient();
   const { data } = await db
     .from("user_profiles")
     .select("*")

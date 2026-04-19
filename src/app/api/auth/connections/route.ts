@@ -6,7 +6,7 @@ import {
   revokeConnectionById,
   type OAuthPlatform,
 } from "@/lib/oauth-connections";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,7 +50,7 @@ export async function DELETE(req: NextRequest) {
   // If the caller passes ?id=… we only drop that one row — used to
   // disconnect a single LinkedIn Page without killing the personal login.
   if (connectionId) {
-    const db = getSupabaseServer();
+    const db = createClient();
     const { data } = await db
       .from("oauth_connections")
       .select("id,user_id")

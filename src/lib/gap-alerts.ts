@@ -4,7 +4,7 @@
  * Pulls the current week's calendar row + recent posts and emits
  * human-readable alerts when the posting cadence drops below target.
  */
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 
 export type GapAlert = {
   kind: "figure_dormant";
@@ -35,7 +35,7 @@ export function currentWeekStart(d: Date = new Date()): string {
 }
 
 export async function ensureCurrentWeek(userId: string): Promise<WeeklyCalendar> {
-  const db = getSupabaseServer();
+  const db = createClient();
   const week = currentWeekStart();
   await db
     .from("content_calendar")
@@ -58,7 +58,7 @@ export async function ensureCurrentWeek(userId: string): Promise<WeeklyCalendar>
 }
 
 export async function computeGapAlerts(userId: string): Promise<GapAlert[]> {
-  const db = getSupabaseServer();
+  const db = createClient();
   await ensureCurrentWeek(userId);
   const alerts: GapAlert[] = [];
 
@@ -81,7 +81,7 @@ export async function computeGapAlerts(userId: string): Promise<GapAlert[]> {
 }
 
 export async function recordPublished(postId: string): Promise<void> {
-  const db = getSupabaseServer();
+  const db = createClient();
   const { data: post } = await db
     .from("posts")
     .select("id,platform,figure_id,topic_tags,user_id")

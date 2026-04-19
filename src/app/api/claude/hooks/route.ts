@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateHooks } from "@/lib/claude-api";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 import type { FigureContext } from "@/lib/system-prompt";
 import { requireUser } from "@/lib/auth";
 
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   let platform = body.platform;
   let topic = body.topic;
   if (body.post_id) {
-    const db = getSupabaseServer();
+    const db = createClient();
     const { data: post } = await db
       .from("posts")
       .select("title, platform, figure_id, transcript")

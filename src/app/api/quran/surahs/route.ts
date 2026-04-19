@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ export async function GET() {
   if (cache) {
     return NextResponse.json({ surahs: cache });
   }
-  const db = getSupabaseServer();
+  const db = createClient();
   const { data, error } = await db
     .from("surah_metadata")
     .select("surah,name_arabic,name_english,name_transliteration,revelation_place,ayah_count")

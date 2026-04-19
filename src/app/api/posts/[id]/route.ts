@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 import { recordPublished } from "@/lib/gap-alerts";
 import { isUuid } from "@/lib/utils";
 import { requireUser } from "@/lib/auth";
@@ -16,7 +16,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const auth = await requireUser();
   if ("response" in auth) return auth.response;
 
-  const db = getSupabaseServer();
+  const db = createClient();
   const { data: post, error } = await db
     .from("posts")
     .select("*")
@@ -104,7 +104,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     update.published_at = new Date().toISOString();
   }
 
-  const db = getSupabaseServer();
+  const db = createClient();
   const { data, error } = await db
     .from("posts")
     .update(update)
@@ -140,7 +140,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   const auth = await requireUser();
   if ("response" in auth) return auth.response;
 
-  const db = getSupabaseServer();
+  const db = createClient();
   const permanent = req.nextUrl.searchParams.get("permanent") === "true";
   if (permanent) {
     const { error } = await db

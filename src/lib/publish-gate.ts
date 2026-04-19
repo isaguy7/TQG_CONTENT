@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 
 /**
  * Thrown when a caller tries to transition a post to status='ready' while
@@ -35,7 +35,7 @@ export class PublishGateError extends Error {
  * posts.status='ready'.
  */
 export async function assertPublishable(postId: string): Promise<void> {
-  const db = getSupabaseServer();
+  const db = createClient();
 
   const { data, error } = await db
     .from("post_hadith_refs")

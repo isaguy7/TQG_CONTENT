@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 import { isUuid } from "@/lib/utils";
 
 export const runtime = "nodejs";
@@ -25,7 +25,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ ok: true });
   }
-  const db = getSupabaseServer();
+  const db = createClient();
   const { error } = await db
     .from("figure_quran_refs")
     .update(patch)
@@ -45,7 +45,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (!VERSE_KEY_RE.test(verseKey)) {
     return NextResponse.json({ error: "Invalid verse key" }, { status: 400 });
   }
-  const db = getSupabaseServer();
+  const db = createClient();
   const { error } = await db
     .from("figure_quran_refs")
     .delete()

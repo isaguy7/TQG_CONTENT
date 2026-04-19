@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 import { isUuid } from "@/lib/utils";
 
 export const runtime = "nodejs";
@@ -11,7 +11,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   if (!isUuid(params.id)) {
     return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
   }
-  const db = getSupabaseServer();
+  const db = createClient();
   const { data: refs, error } = await db
     .from("figure_hadith_refs")
     .select("figure_id,hadith_corpus_id,relevance_note,created_at")
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       { status: 400 }
     );
   }
-  const db = getSupabaseServer();
+  const db = createClient();
   const { error } = await db.from("figure_hadith_refs").upsert(
     {
       figure_id: params.id,

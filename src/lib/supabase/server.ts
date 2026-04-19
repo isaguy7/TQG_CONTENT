@@ -1,15 +1,15 @@
+// async, awaits Next cookies for RLS context
+//
+// Session-aware Supabase client for use in Server Components, Route Handlers,
+// and Server Actions. Reads/writes the auth cookies set by `@supabase/ssr` so
+// that requests run with the signed-in user's RLS context.
+//
+// For privileged admin queries (e.g. shared corpus seeded by service role)
+// use `createClient` from `@/lib/supabase/admin` instead.
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-/**
- * Session-aware Supabase client for use in Server Components, Route Handlers,
- * and Server Actions. Reads/writes the auth cookies set by `@supabase/ssr` so
- * that requests run with the signed-in user's RLS context.
- *
- * For privileged admin queries (e.g. shared corpus seeded by service role)
- * keep using `getSupabaseServer()` from `@/lib/supabase`.
- */
 export async function createClient(): Promise<SupabaseClient> {
   const cookieStore = await cookies();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

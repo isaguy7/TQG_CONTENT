@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 import { getUserProfile } from "@/lib/user-profile";
 
 export const runtime = "nodejs";
@@ -57,7 +57,7 @@ export async function PATCH(
     );
   }
 
-  const db = getSupabaseServer();
+  const db = createClient();
   const now = new Date().toISOString();
   let update: Record<string, unknown> = { updated_at: now };
   if (action === "approve") {

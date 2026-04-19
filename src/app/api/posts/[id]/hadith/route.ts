@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/admin";
 import { isUuid } from "@/lib/utils";
 import { requireUser } from "@/lib/auth";
 
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 type Params = { params: { id: string } };
 
 async function ownsPost(
-  db: ReturnType<typeof getSupabaseServer>,
+  db: ReturnType<typeof createClient>,
   postId: string,
   userId: string
 ): Promise<boolean> {
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     );
   }
 
-  const db = getSupabaseServer();
+  const db = createClient();
   if (!(await ownsPost(db, params.id, auth.user.id))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -86,7 +86,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     );
   }
 
-  const db = getSupabaseServer();
+  const db = createClient();
   if (!(await ownsPost(db, params.id, auth.user.id))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
