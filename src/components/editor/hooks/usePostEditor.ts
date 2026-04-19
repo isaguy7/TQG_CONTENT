@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
+import CharacterCount from "@tiptap/extension-character-count";
 import type { JSONContent } from "@tiptap/core";
 import type { TiptapJson } from "@/types/post";
 
@@ -25,21 +27,34 @@ export interface UsePostEditorOptions {
 /**
  * Configured Tiptap editor for post content. Loads content_json when
  * present; falls back to wrapping final_content as paragraphs for legacy
- * rows (posts created before V10 §5).
+ * rows (posts created before V10 §5 editor).
  *
  * StarterKit is configured without headings per V10 §5 — post bodies are
- * flat paragraph streams; platform renderers don't honor heading styles
- * anyway.
+ * flat paragraph streams; platform renderers don't honor heading styles.
  *
  * SSR note: immediatelyRender=false is required in the App Router so the
  * initial SSR pass doesn't try to instantiate ProseMirror in a Node env.
  * First render returns null; the client hydrates with a real editor.
+ *
+ * Callback indirection: Tiptap's useEditor captures options on first mount
+ * and never re-reads them. We stash handlers in refs so the editor's
+ * onUpdate / onBlur always dispatch to the *current* parent callback, not
+ * a stale closure from first render.
  */
 export function usePostEditor({
   post,
   onPlainTextChange,
   onBlur,
 }: UsePostEditorOptions): Editor | null {
+  const plainTextRef = useRef(onPlainTextChange);
+  const blurRef = useRef(onBlur);
+  useEffect(() => {
+    plainTextRef.current = onPlainTextChange;
+  }, [onPlainTextChange]);
+  useEffect(() => {
+    blurRef.current = onBlur;
+  }, [onBlur]);
+
   return useEditor({
     extensions: [
       StarterKit.configure({
@@ -53,6 +68,11 @@ export function usePostEditor({
           target: "_blank",
         },
       }),
+      // No hard limit here — the PlatformCharacterCounter renders a
+      // visual warning when the active platform's warn threshold is
+      // crossed. Blocking input at the limit is unfriendly when the
+      // user is iterating across multiple platforms with different caps.
+      CharacterCount.configure({ limit: null }),
     ],
     content: resolveInitialContent(post),
     immediatelyRender: false,
@@ -63,10 +83,10 @@ export function usePostEditor({
       },
     },
     onUpdate: ({ editor }) => {
-      onPlainTextChange?.(editor.getText());
+      plainTextRef.current?.(editor.getText());
     },
     onBlur: ({ editor }) => {
-      onBlur?.(editor.getText());
+      blurRef.current?.(editor.getText());
     },
   });
 }

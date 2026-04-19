@@ -41,10 +41,12 @@ type Post = {
   id: string;
   title: string | null;
   final_content: string | null;
+  content_html: string | null;
   content_json: unknown | null;
   status: PostStatus;
   platform: string;
-  platforms?: string[] | null;
+  platforms?: PlatformId[] | null;
+  platform_versions?: Record<string, unknown> | null;
   figure_id: string | null;
   hook_selected: string | null;
   image_url: string | null;
@@ -429,9 +431,49 @@ export default function PostEditorPage() {
           <PostEditor
             post={post}
             onPlainTextChange={setDraft}
-            onBlur={(text) => {
-              if (text !== (post.final_content ?? "")) {
-                save({ final_content: text });
+            onBlur={({ variant, text, html, json }) => {
+              if (variant === "canonical") {
+                // Only push a save when the canonical content actually
+                // changed. Skips the churny round-trip when the user
+                // just focuses in and out without editing.
+                if (text === (post.final_content ?? "")) return;
+                save({
+                  final_content: text,
+                  content_html: html,
+                  content_json: json,
+                });
+              } else {
+                // Variant save — merge into platform_versions; signal
+                // back to the editor so the differs-dot on the tab
+                // reflects the new saved state.
+                const existing = (post.platform_versions ?? {}) as Record<
+                  string,
+                  unknown
+                >;
+                const prior = existing[variant] as
+                  | { final_content?: string | null }
+                  | undefined;
+                if (text === (prior?.final_content ?? "")) return;
+                save({
+                  platform_versions: {
+                    ...existing,
+                    [variant]: {
+                      final_content: text,
+                      content_html: html,
+                      content_json: json,
+                    },
+                  },
+                });
+                const differs = text !== (post.final_content ?? "");
+                const ed = editorRef.current as
+                  | (TiptapEditor & {
+                      __markVariantSaved?: (
+                        variant: PlatformId,
+                        differs: boolean
+                      ) => void;
+                    })
+                  | null;
+                ed?.__markVariantSaved?.(variant, differs);
               }
             }}
             onReady={(ed) => {

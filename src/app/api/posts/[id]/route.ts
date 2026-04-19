@@ -59,8 +59,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   let body: {
     title?: string;
     final_content?: string | null;
+    content_html?: string | null;
+    content_json?: unknown;
     status?: "idea" | "draft" | "scheduled" | "published" | "failed" | "archived";
     platform?: string;
+    platform_versions?: Record<string, unknown>;
     figure_id?: string | null;
     hook_selected?: string | null;
     image_url?: string | null;
@@ -84,8 +87,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const writable: (keyof typeof body)[] = [
     "title",
     "final_content",
+    "content_html",
+    "content_json",
     "status",
     "platform",
+    "platform_versions",
     "figure_id",
     "hook_selected",
     "image_url",
