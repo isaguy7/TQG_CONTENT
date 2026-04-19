@@ -78,6 +78,50 @@ Roughly 55 candidate sites across 26 files.
 constants (platform lists, nav items, enum arrays), computed-always-present
 derived data with guarantees, and library internals.
 
+### Brand palette consistency
+
+Identified 2026-04-19 during V10 M1 §3 sidebar polish. Pre-V10 UI (PR #12
+premium overhaul) used emerald + cyan for brand accents. V10 locks
+TQG green `#1B5E20` as the sole brand accent color per
+`V10_Product_Context.md`.
+
+Resolution: repaint as section rewrites touch each file. Don't
+standalone-repaint — natural sweep during §4 kanban, §5 editor rewrite,
+§6 figures, §9 AI assistant, etc.
+
+**Excluded from this list:** semantic colors meaning "connected /
+verified / success / good usage" — those stay emerald because their
+meaning is the green = ok signal, not the brand. Specifically excluded
+the connection-status indicators in `ClaudeStatusCard`, `ClaudeUsage`,
+`IntegrationsBar`, `IntegrationsDetail`, `LinkedInPages`, `LocalStudio`,
+`PublishPanel` success rows, `SlopChecker` "no slop" state, and
+`TypefullyPush` "already pushed" badge.
+
+Active drift sites (60 occurrences across 17 files):
+
+| File | Lines | Section that will repaint |
+|------|------:|---------------------------|
+| `src/app/(app)/calendar/page.tsx` | 234, 276 | §13 calendar |
+| `src/app/(app)/clips/new/page.tsx` | 727, 739, 760 | M3 clip creator |
+| `src/app/(app)/content/[id]/page.tsx` | 272, 280, 323 | §5 editor rewrite |
+| `src/app/(app)/figures/[id]/page.tsx` | 37 (sahabi tint) | §6 figure library |
+| `src/app/(app)/figures/page.tsx` | 33, 43 (sahabi tint) | §6 figure library |
+| `src/app/(app)/page.tsx` | 138 | §15 dashboard polish |
+| `src/app/(app)/queue/page.tsx` | 86, 95, 147, 161, 192 | M3 clip creator |
+| `src/app/(auth)/login/page.tsx` | 122 (info card) | §0 onboarding polish |
+| `src/components/AiAssistantDrawer.tsx` | 130, 132, 178, 190, 201, 206, 223, 243, 274, 308, 314 | §9 AI assistant (full rebuild) |
+| `src/components/FigureContextPanel.tsx` | 459, 519, 527 | §6 figure library |
+| `src/components/FigureRefsPanel.tsx` | 465 | §6 figure library |
+| `src/components/HadithPanel.tsx` | 448 (grade label) | §7 hadith system |
+| `src/components/PostLabels.tsx` | 17 (label color) | §4 kanban |
+| `src/components/PublishPanel.tsx` | 312 (button gradient) | §10 LinkedIn OAuth |
+| `src/components/Sidebar.tsx` | 199, 212, 240, 262, 265, 273, 333 (Idea inbox + popover) | §3.4 / §17 admin polish |
+
+Sahabi/figure-type tints (`figures/page.tsx:33,43` and `figures/[id]/page.tsx:37`)
+sit on the brand/semantic boundary — emerald is the chosen tint for the
+`sahabi` figure type out of a 4-color palette. Treat as a §6 design
+decision rather than mechanical repaint.
+
 ## Resolved debt
 
 _empty — populate as items close_
