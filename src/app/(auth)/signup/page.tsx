@@ -49,14 +49,10 @@ export default function SignupPage() {
     setSlug(deriveSlug(email));
   }, [email, slugTouched]);
 
-  useEffect(() => {
-    if (!workspaceName) {
-      const local = email.split("@")[0] ?? "";
-      if (local) setWorkspaceName(`${local}'s Workspace`);
-    }
-    // intentionally not depending on workspaceName so user edits stick
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [email]);
+  // Workspace name is NOT auto-derived from email: the slug derivation
+  // strips +subaddress and other non-URL-safe chars, which is correct
+  // for URLs but misleading as a display name. User types the name
+  // deliberately; the placeholder hints at reasonable formats.
 
   // Debounced slug availability check.
   useEffect(() => {
@@ -261,7 +257,7 @@ export default function SignupPage() {
               onChange={(e) => setWorkspaceName(e.target.value)}
               disabled={busy}
               className="w-full px-3 py-2 rounded-md bg-black/40 border border-white/[0.1] text-[13px] text-white/90 placeholder:text-white/30 focus:outline-none focus:border-white/30 disabled:opacity-50"
-              placeholder="My Workspace"
+              placeholder="e.g. My Content Studio, TQG Workspace"
             />
           </div>
 
