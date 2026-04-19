@@ -5,7 +5,7 @@ import type { OrgRole } from "@/types/org";
 
 export class AuthError extends Error {
   readonly code = "AUTH_REQUIRED" as const;
-  constructor(message = "Authentication required") {
+  constructor(message = "Not authenticated") {
     super(message);
     this.name = "AuthError";
   }
@@ -13,18 +13,22 @@ export class AuthError extends Error {
 
 export class OrgError extends Error {
   readonly code = "ORG_FORBIDDEN" as const;
-  constructor(message = "Forbidden") {
+  constructor(message: string) {
     super(message);
     this.name = "OrgError";
   }
 }
 
-const ROLE_RANK: Record<OrgRole, number> = {
-  viewer: 1,
-  editor: 2,
-  admin: 3,
-  owner: 4,
+const ROLE_LEVELS: Record<OrgRole, number> = {
+  viewer: 0,
+  editor: 1,
+  admin: 2,
+  owner: 3,
 };
+
+function hasRole(actual: OrgRole, required: OrgRole): boolean {
+  return ROLE_LEVELS[actual] >= ROLE_LEVELS[required];
+}
 
 export async function getActiveOrgId(): Promise<string | null> {
   const supabase = await createClient();
@@ -80,7 +84,7 @@ export async function requireRole(
   if (!member) throw new OrgError("Not a member of this organization");
 
   const actualRole = member.role as OrgRole;
-  if (ROLE_RANK[actualRole] < ROLE_RANK[required]) {
+  if (!hasRole(actualRole, required)) {
     throw new OrgError(`Requires ${required}, have ${actualRole}`);
   }
 
