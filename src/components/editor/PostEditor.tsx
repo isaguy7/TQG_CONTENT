@@ -11,6 +11,7 @@ import { useAutosave, type SavePayload } from "./hooks/useAutosave";
 import { EditorToolbar } from "./EditorToolbar";
 import { CharacterCounter } from "./CharacterCounter";
 import { AutosaveStatus } from "./AutosaveStatus";
+import { CopyForTypefullyButton } from "./CopyForTypefullyButton";
 import { VersionHistoryDialog } from "./VersionHistoryDialog";
 import {
   PlatformVariantTabs,
@@ -230,6 +231,9 @@ export function PostEditor({
           differsFromCanonical={differsFromCanonical}
         />
         <div className="flex items-center gap-2">
+          <CopyForTypefullyButton
+            getText={() => editor?.getText() ?? ""}
+          />
           <button
             type="button"
             onClick={() => setHistoryOpen(true)}
