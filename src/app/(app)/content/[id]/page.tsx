@@ -5,16 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { PageShell } from "@/components/PageShell";
 import { cn } from "@/lib/utils";
-import {
-  SearchCorpus,
-  type HadithRecord,
-} from "@/components/HadithPanel";
-import {
-  PLATFORMS,
-  counterTone,
-  getPlatform,
-  type PlatformId,
-} from "@/lib/platform-rules";
+import { type HadithRecord } from "@/components/HadithPanel";
+import { AttachedHadithPanel } from "@/components/editor/AttachedHadithPanel";
+import { PLATFORMS, getPlatform, type PlatformId } from "@/lib/platform-rules";
 import { buildSystemPrompt, type FigureContext } from "@/lib/system-prompt";
 import { ConvertPreviews } from "@/components/ConvertPreviews";
 import { PublishPanel } from "@/components/PublishPanel";
@@ -80,7 +73,6 @@ export default function PostEditorPage() {
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [copyMsg, setCopyMsg] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
-  const [corpusOpen, setCorpusOpen] = useState(false);
   const initialLoadDone = useRef(false);
   const editorRef = useRef<TiptapEditor | null>(null);
 
@@ -245,7 +237,6 @@ export default function PostEditorPage() {
   };
 
   const moveToDrafts = () => save({ status: "draft" as PostStatus });
-  const moveToIdeas = () => save({ status: "idea" as PostStatus });
 
   const attachedIds = useMemo(() => new Set(attached.map((h) => h.id)), [attached]);
   const availableHadith = useMemo(
@@ -253,16 +244,10 @@ export default function PostEditorPage() {
     [allHadith, attachedIds]
   );
 
-  const platformCfg = useMemo(
-    () => getPlatform(post?.platform),
+  const platformLabel = useMemo(
+    () => getPlatform(post?.platform).label,
     [post?.platform]
   );
-  const charCount = draft.length;
-  const tone = counterTone(charCount, platformCfg);
-  const pct = Math.min(100, (charCount / platformCfg.charLimit) * 100);
-  const visiblePreview =
-    draft.slice(0, platformCfg.visibleBefore) +
-    (draft.length > platformCfg.visibleBefore ? "…" : "");
 
   if (loading) {
     return (
@@ -288,28 +273,12 @@ export default function PostEditorPage() {
     );
   }
 
-  const counterColor =
-    tone === "over"
-      ? "text-danger"
-      : tone === "warn"
-        ? "text-amber-400"
-        : tone === "optimal"
-          ? "text-emerald-400"
-          : "text-white/60";
-  const barColor =
-    tone === "over"
-      ? "bg-danger"
-      : tone === "warn"
-        ? "bg-amber-400"
-        : tone === "optimal"
-          ? "bg-emerald-400"
-          : "bg-white/40";
   const isIdea = post.status === "idea";
 
   return (
     <PageShell
       title={post.title || "Untitled draft"}
-      description={`${platformCfg.label} · ${post.status}`}
+      description={`${platformLabel} · ${post.status}`}
       actions={
         <>
           {saveMsg ? (
@@ -349,21 +318,7 @@ export default function PostEditorPage() {
             >
               Move to drafts
             </button>
-          ) : (
-            <details className="relative">
-              <summary className="px-3 py-1.5 rounded-lg text-[12px] border border-white/[0.1] text-white/75 hover:bg-white/[0.05] cursor-pointer">
-                Status menu
-              </summary>
-              <div className="absolute right-0 mt-2 w-44 rounded-xl border border-white/[0.08] bg-white/[0.08] backdrop-blur-md shadow-lg shadow-black/30 p-2 z-10">
-                <button
-                  onClick={moveToIdeas}
-                  className="w-full text-left px-2 py-1.5 rounded-md text-[12px] text-white/85 hover:bg-white/[0.12] transition-colors"
-                >
-                  Move back to ideas
-                </button>
-              </div>
-            </details>
-          )}
+          ) : null}
           <button
             onClick={copyForClaude}
             className="px-3 py-1.5 rounded text-[12px] border border-white/[0.08] text-white/85 hover:text-white hover:bg-white/[0.04]"
@@ -444,63 +399,6 @@ export default function PostEditorPage() {
               editorRef.current = ed;
             }}
           />
-
-          <div className="mt-5 pt-4 border-t border-white/[0.06]">
-            <div className="flex items-center justify-between text-[12px]">
-              <div className="flex items-center gap-3">
-                <span className={cn("font-medium tabular-nums", counterColor)}>
-                  {charCount.toLocaleString()} / {platformCfg.charLimit.toLocaleString()}
-                </span>
-                <span className="text-white/40">
-                  optimal {platformCfg.optimalRange[0]}-
-                  {platformCfg.optimalRange[1]}
-                </span>
-              </div>
-              <span className={cn("text-[11px]", counterColor)}>
-                {tone === "over"
-                  ? "Over limit"
-                  : tone === "warn"
-                    ? "Past optimal"
-                    : tone === "optimal"
-                      ? "In the zone"
-                      : "Below optimal"}
-              </span>
-            </div>
-            <div className="mt-2 h-2 rounded-full bg-white/[0.05] overflow-hidden">
-              <div
-                className={cn("h-full rounded-full transition-all", barColor)}
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-            {charCount > 0 ? (
-              <div className="mt-3 rounded-md border border-dashed border-white/10 bg-white/[0.02] p-2 text-[11px] text-white/55 leading-relaxed">
-                <span className="text-white/35 mr-1">
-                  First {platformCfg.visibleBefore} chars visible in feed:
-                </span>
-                <span className="text-white/80">
-                  {visiblePreview || "—"}
-                </span>
-              </div>
-            ) : null}
-
-            <details className="mt-3 text-[12px]">
-              <summary className="cursor-pointer text-white/55 hover:text-white/80">
-                {platformCfg.label} formatting tips
-              </summary>
-              <ul className="mt-2 space-y-1 text-white/70 leading-relaxed">
-                {platformCfg.formatNotes.map((n) => (
-                  <li key={n} className="pl-3 relative">
-                    <span className="absolute left-0 text-white/30">·</span>
-                    {n}
-                  </li>
-                ))}
-                <li className="pl-3 relative pt-1 text-white/50">
-                  <span className="absolute left-0 text-white/30">·</span>
-                  Hashtags: {platformCfg.hashtagAdvice}
-                </li>
-              </ul>
-            </details>
-          </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-4 text-[12px]">
             <label className="flex items-center gap-2">
@@ -644,93 +542,13 @@ export default function PostEditorPage() {
           }}
         />
 
-        <section className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="section-label">
-              Hadith references ({attached.length})
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCorpusOpen((v) => !v)}
-                className="px-2 py-1 rounded text-[11px] border border-white/[0.08] text-white/70 hover:text-white hover:bg-white/[0.04]"
-              >
-                {corpusOpen ? "Hide corpus" : "Search corpus"}
-              </button>
-            </div>
-          </div>
-
-          {corpusOpen ? (
-            <div className="mb-4 rounded-md border border-white/[0.06] bg-white/[0.02] p-3">
-              <SearchCorpus
-                onAdded={() => {
-                  loadPost();
-                }}
-              />
-            </div>
-          ) : null}
-
-          {attached.length === 0 ? (
-            <div className="text-[12px] text-white/40">
-              No references attached. Attach from the list below or search the
-              corpus.
-            </div>
-          ) : (
-            <ul className="space-y-1 mb-4">
-              {attached.map((h) => (
-                <li
-                  key={h.id}
-                  className="flex items-center gap-3 p-2 rounded bg-white/[0.02] border border-white/[0.04]"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[12px] text-white/85 truncate">
-                      {h.reference_text}
-                    </div>
-                    {h.sunnah_com_url ? (
-                      <a
-                        href={h.sunnah_com_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[11px] text-white/40 hover:text-white/70 truncate block underline underline-offset-2"
-                      >
-                        {h.sunnah_com_url}
-                      </a>
-                    ) : null}
-                  </div>
-                  <button
-                    onClick={() => detachHadith(h.id)}
-                    className="px-2 py-1 rounded text-[11px] border border-white/[0.08] text-white/50 hover:text-white"
-                  >
-                    Detach
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {availableHadith.length > 0 ? (
-            <details className="text-[12px] text-white/70">
-              <summary className="cursor-pointer hover:text-white/90 pb-2">
-                Attach existing reference ({availableHadith.length} available)
-              </summary>
-              <ul className="space-y-1">
-                {availableHadith.map((h) => (
-                  <li
-                    key={h.id}
-                    className="flex items-center gap-2 p-2 rounded hover:bg-white/[0.03]"
-                  >
-                    <div className="flex-1 min-w-0 truncate">{h.reference_text}</div>
-                    <button
-                      onClick={() => attachHadith(h.id)}
-                      className="px-2 py-1 rounded text-[11px] border border-white/[0.08] text-white/70 hover:text-white hover:bg-white/[0.04]"
-                    >
-                      Attach
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          ) : null}
-        </section>
+        <AttachedHadithPanel
+          attached={attached}
+          availableHadith={availableHadith}
+          onAttach={attachHadith}
+          onDetach={detachHadith}
+          onCorpusAdded={loadPost}
+        />
 
         <ImagePicker
           imageUrl={post.image_url}
