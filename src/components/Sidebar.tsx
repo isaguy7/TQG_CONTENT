@@ -168,14 +168,11 @@ export function Sidebar() {
                 className={cn(
                   "group relative flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200",
                   active
-                    ? "bg-emerald-500/15 text-emerald-50 ring-1 ring-emerald-400/60 shadow-[0_8px_24px_rgba(16,185,129,0.25)]"
+                    ? "bg-[#1B5E20]/15 text-white ring-1 ring-[#1B5E20]/60 shadow-[0_0_14px_rgba(27,94,32,0.5)]"
                     : "text-white/60 hover:text-white hover:bg-white/[0.06]"
                 )}
               >
                 <Icon className="w-5 h-5" />
-                {active ? (
-                  <span className="absolute left-1 w-1.5 h-7 rounded-full bg-gradient-to-b from-emerald-400 to-cyan-400" />
-                ) : null}
                 <span className="sr-only">{label}</span>
                 <span className="pointer-events-none absolute left-14 z-20 rounded-lg bg-white/10 backdrop-blur-md px-2 py-1 text-[11px] text-white/85 opacity-0 shadow-xl shadow-black/30 transition-opacity duration-150 group-hover:opacity-100">
                   {label}
