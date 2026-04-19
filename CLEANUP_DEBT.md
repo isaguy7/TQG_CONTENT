@@ -8,6 +8,16 @@ New entries go at the top.
 
 ---
 
+- **2026-04-19 — `posts.platforms` has no CHECK constraint.** The new
+  `platforms TEXT[]` column (added in `20260419111246_v10_post_status_and_columns`)
+  accepts any string, unlike the pre-existing `posts.platform` scalar which
+  is restricted to `linkedin/x/instagram/facebook/meta` via CHECK. A post
+  row could be inserted with `platforms = ['bluesky']` today and the editor
+  would crash on platform-config lookup. Add a CHECK that every element
+  of `platforms` is one of `linkedin/x/instagram/facebook/meta` in a
+  future migration. Low-priority until public signup opens; today only
+  Isa can write posts and none do.
+
 - **2026-04-19 — `pg_trgm` extension still in `public` schema.** Move to
   `extensions` schema. Two indexes depend on it and need to be verified
   after the move:

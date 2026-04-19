@@ -20,8 +20,14 @@ export interface PostEditorSource {
 
 export interface UsePostEditorOptions {
   post: PostEditorSource;
+  /** Fires on every keystroke with plain-text content. Convenience for
+   *  downstream consumers (char counter mirror, PublishPanel preview). */
   onPlainTextChange?: (text: string) => void;
-  onBlur?: (text: string) => void;
+  /** Fires on every keystroke with the editor instance. Richer callback
+   *  used by useAutosave to capture full {text, html, json} snapshots. */
+  onUpdate?: (editor: Editor) => void;
+  /** Fires when the editor loses focus, with the editor instance. */
+  onBlur?: (editor: Editor) => void;
 }
 
 /**
@@ -44,13 +50,18 @@ export interface UsePostEditorOptions {
 export function usePostEditor({
   post,
   onPlainTextChange,
+  onUpdate,
   onBlur,
 }: UsePostEditorOptions): Editor | null {
   const plainTextRef = useRef(onPlainTextChange);
+  const updateRef = useRef(onUpdate);
   const blurRef = useRef(onBlur);
   useEffect(() => {
     plainTextRef.current = onPlainTextChange;
   }, [onPlainTextChange]);
+  useEffect(() => {
+    updateRef.current = onUpdate;
+  }, [onUpdate]);
   useEffect(() => {
     blurRef.current = onBlur;
   }, [onBlur]);
@@ -84,9 +95,10 @@ export function usePostEditor({
     },
     onUpdate: ({ editor }) => {
       plainTextRef.current?.(editor.getText());
+      updateRef.current?.(editor);
     },
     onBlur: ({ editor }) => {
-      blurRef.current?.(editor.getText());
+      blurRef.current?.(editor);
     },
   });
 }

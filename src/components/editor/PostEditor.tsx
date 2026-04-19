@@ -6,17 +6,18 @@ import type { JSONContent } from "@tiptap/core";
 import type { PlatformId } from "@/lib/platform-rules";
 import type { TiptapJson } from "@/types/post";
 import { usePostEditor, type PostEditorSource } from "./hooks/usePostEditor";
+import { useAutosave, type SavePayload } from "./hooks/useAutosave";
 import { EditorToolbar } from "./EditorToolbar";
 import { CharacterCounter } from "./CharacterCounter";
+import { AutosaveStatus } from "./AutosaveStatus";
 import {
   PlatformVariantTabs,
   type EditorVariant,
 } from "./PlatformVariantTabs";
 
 /**
- * Per-variant content snapshot held in memory while the user edits. Only
- * flushed to DB by the parent on blur (commit 5 scaffold); autosave in
- * commit 6 makes this persist on every debounce tick.
+ * Per-variant content snapshot held in memory while the user edits.
+ * Written to DB by useAutosave (3s debounced) and on blur (flush).
  */
 export interface VariantSnapshot {
   text: string;
@@ -24,39 +25,40 @@ export interface VariantSnapshot {
   json: JSONContent;
 }
 
-export interface BlurPayload extends VariantSnapshot {
-  variant: EditorVariant;
+/** Mirrored from /api/posts/[id] PATCH response. Looser than the full
+ *  canonical Post type so clients with narrow local shapes pass through. */
+export interface ServerPostSnapshot {
+  platform_versions?: Record<string, unknown> | null;
+  [key: string]: unknown;
 }
 
 export interface PostEditorProps {
+  /** Post id for autosave's PATCH target. Stable — autosave hook is
+   *  instantiated once per mount. */
+  postId: string;
   post: PostEditorSource & {
     platforms?: PlatformId[] | null;
     platform_versions?: Record<string, unknown> | null;
   };
   /** Fires on every keystroke with the current plain-text content. */
   onPlainTextChange?: (text: string) => void;
-  /**
-   * Fires when the editor loses focus with a snapshot of the active
-   * variant's content. Parent dispatches to posts.content_* (canonical)
-   * or posts.platform_versions[variant] (platform).
-   */
-  onBlur?: (payload: BlurPayload) => void;
+  /** Called with the server's post response after each successful save.
+   *  Parent re-seeds its local Post state from this. */
+  onServerUpdate?: (post: ServerPostSnapshot) => void;
   /** Exposes the Tiptap editor instance (e.g. for external insertions). */
   onReady?: (editor: Editor) => void;
-  placeholder?: string;
 }
 
-const EMPTY_DOC: JSONContent = { type: "doc", content: [{ type: "paragraph" }] };
+const EMPTY_DOC: JSONContent = {
+  type: "doc",
+  content: [{ type: "paragraph" }],
+};
 
-/**
- * Variants are keyed to a single Tiptap editor instance. On tab switch
- * we save the outgoing variant's snapshot to a map and setContent with
- * the incoming variant's snapshot.
- */
 export function PostEditor({
+  postId,
   post,
   onPlainTextChange,
-  onBlur,
+  onServerUpdate,
   onReady,
 }: PostEditorProps) {
   const platforms = (post.platforms ?? []) as PlatformId[];
@@ -66,50 +68,65 @@ export function PostEditor({
     useState<EditorVariant>("canonical");
   const activeVariantRef = useRef<EditorVariant>("canonical");
 
-  // variantsMap holds the working state for each variant the user has
-  // visited this session. Canonical is seeded from post.content_json
-  // once the editor mounts.
+  // Per-variant in-memory working state. Canonical seeds from
+  // post.content_json on editor ready; variants seed from
+  // post.platform_versions or fall back to a copy of canonical.
   const variantsMap = useRef<Map<EditorVariant, VariantSnapshot>>(new Map());
 
-  // Tracks which stored variants differ from canonical (drives the
-  // emerald dot on variant tabs). Seeded from post.platform_versions
-  // on mount; updated when the user saves a variant.
   const [differsFromCanonical, setDiffersFromCanonical] = useState<
     ReadonlySet<PlatformId>
-  >(() => {
-    const set = new Set<PlatformId>();
-    const versions = (post.platform_versions ?? {}) as Record<
-      string,
-      { final_content?: string | null }
-    >;
-    for (const p of platforms) {
-      const variant = versions[p];
-      if (!variant) continue;
-      if ((variant.final_content ?? "") !== (post.final_content ?? "")) {
-        set.add(p);
-      }
-    }
-    return set;
+  >(() => buildDiffersSet(post, platforms));
+
+  // Autosave hook — instantiated once per mount, variant lives on payload.
+  const autosave = useAutosave({
+    postId,
+    onServerUpdate: (serverPost) => {
+      // 1. Forward to parent so it can keep its Post state fresh.
+      onServerUpdate?.(serverPost as ServerPostSnapshot);
+      // 2. Re-seed variant-differs Set from authoritative server data.
+      //    Fixes commit 5's stale-set-after-variant-save concern.
+      setDiffersFromCanonical(
+        buildDiffersSet(
+          {
+            final_content: (serverPost.final_content as string | null) ?? null,
+            platform_versions:
+              (serverPost.platform_versions as Record<string, unknown>) ?? null,
+          },
+          platforms
+        )
+      );
+    },
   });
+
+  const buildSavePayload = useCallback(
+    (ed: Editor, variant: EditorVariant): SavePayload => ({
+      variant,
+      text: ed.getText(),
+      html: ed.getHTML(),
+      json: ed.getJSON(),
+    }),
+    []
+  );
 
   const editor = usePostEditor({
     post,
     onPlainTextChange,
-    onBlur: (text) => {
-      const ed = editor; // closure captures editor below; safe to use ref
-      if (!ed) return;
-      const snapshot: VariantSnapshot = {
-        text,
-        html: ed.getHTML(),
-        json: ed.getJSON(),
-      };
-      variantsMap.current.set(activeVariantRef.current, snapshot);
-      onBlur?.({ variant: activeVariantRef.current, ...snapshot });
+    // Route keystroke updates into the debounced autosave. triggerSave
+    // overwrites any prior pending payload, so the 3s timer always ends
+    // up saving the latest content.
+    onUpdate: (ed) => {
+      autosave.triggerSave(buildSavePayload(ed, activeVariantRef.current));
+    },
+    // Blur flushes immediately so explicit "I'm done editing" moments
+    // don't wait 3s. The mutex inside useAutosave prevents this from
+    // racing the debounced save.
+    onBlur: (ed) => {
+      autosave.triggerSave(buildSavePayload(ed, activeVariantRef.current));
+      void autosave.flushSave();
     },
   });
 
-  // Initial-ready callback. Also capture the canonical snapshot into the
-  // map so tab switches don't need to re-resolve post.content_json.
+  // Initial-ready: seed canonical snapshot, expose editor to parent.
   useEffect(() => {
     if (!editor) return;
     variantsMap.current.set("canonical", {
@@ -120,23 +137,27 @@ export function PostEditor({
     onReady?.(editor);
   }, [editor, onReady]);
 
-  // Keep activeVariantRef in sync with state for the onBlur closure above.
   useEffect(() => {
     activeVariantRef.current = activeVariant;
   }, [activeVariant]);
 
   const handleVariantChange = useCallback(
-    (next: EditorVariant) => {
+    async (next: EditorVariant) => {
       if (!editor || next === activeVariant) return;
 
-      // 1. Capture current editor state for the outgoing variant.
+      // 1. Flush any pending save for the outgoing variant so we don't
+      //    save stale-variant content under the new variant's name.
+      await autosave.flushSave();
+      autosave.cancelPending();
+
+      // 2. Capture current editor state for the outgoing variant.
       variantsMap.current.set(activeVariant, {
         text: editor.getText(),
         html: editor.getHTML(),
         json: editor.getJSON(),
       });
 
-      // 2. Resolve incoming variant's content: in-memory first, then DB.
+      // 3. Resolve incoming variant's content: in-memory first, then DB.
       let incoming = variantsMap.current.get(next);
       if (!incoming) {
         if (next === "canonical") {
@@ -162,8 +183,6 @@ export function PostEditor({
               json: saved.content_json as JSONContent,
             };
           } else {
-            // No saved variant yet — seed from canonical so the user
-            // edits a copy rather than starting from a blank slate.
             const canonical = variantsMap.current.get("canonical");
             incoming = canonical ?? {
               text: post.final_content ?? "",
@@ -175,43 +194,14 @@ export function PostEditor({
         variantsMap.current.set(next, incoming);
       }
 
-      // 3. Swap editor content. `false` = don't emit an update event (no
-      // need to bounce through onPlainTextChange for a load).
+      // 4. Swap editor content without emitting an update (a load isn't
+      //    a user edit — shouldn't trigger autosave).
       editor.commands.setContent(incoming.json, { emitUpdate: false });
       setActiveVariant(next);
-
-      // 4. Push the new tab's plain text to the parent so the char counter
-      // and downstream consumers reflect the switch.
       onPlainTextChange?.(incoming.text);
     },
-    [editor, activeVariant, post, onPlainTextChange]
+    [editor, activeVariant, post, onPlainTextChange, autosave]
   );
-
-  // Allow the parent to learn about differs-state changes when it saves
-  // a variant (parent is the one that writes to DB). Exposed via ref-
-  // style imperative API would be overkill for one signal — instead,
-  // the parent can directly set this via the onBlur callback adding to
-  // a shared state. For commit 5 we compute purely from saved state at
-  // mount and update locally when the user saves.
-  const markVariantSaved = useCallback(
-    (variant: PlatformId, differs: boolean) => {
-      setDiffersFromCanonical((prev) => {
-        const next = new Set(prev);
-        if (differs) next.add(variant);
-        else next.delete(variant);
-        return next;
-      });
-    },
-    []
-  );
-  // Attach to the editor instance so the page-level save handler can
-  // signal back after the DB write lands. This dodges a prop-drilling
-  // callback chain for a single signal.
-  useEffect(() => {
-    if (!editor) return;
-    (editor as unknown as { __markVariantSaved?: typeof markVariantSaved }).__markVariantSaved =
-      markVariantSaved;
-  }, [editor, markVariantSaved]);
 
   const primary = useMemo(
     () => (activeVariant === "canonical" ? primaryPlatform : activeVariant),
@@ -228,12 +218,20 @@ export function PostEditor({
 
   return (
     <div>
-      <PlatformVariantTabs
-        platforms={platforms}
-        active={activeVariant}
-        onChange={handleVariantChange}
-        differsFromCanonical={differsFromCanonical}
-      />
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <PlatformVariantTabs
+          platforms={platforms}
+          active={activeVariant}
+          onChange={handleVariantChange}
+          differsFromCanonical={differsFromCanonical}
+        />
+        <AutosaveStatus
+          state={autosave.state}
+          onRetry={() => {
+            void autosave.flushSave();
+          }}
+        />
+      </div>
       <EditorToolbar editor={editor} />
       <EditorContent editor={editor} />
       <div className="mt-3 pt-3 border-t border-white/[0.06] flex items-center justify-end">
@@ -241,4 +239,30 @@ export function PostEditor({
       </div>
     </div>
   );
+}
+
+/**
+ * Compute which platform variants currently differ from canonical on
+ * plain-text content. Drives the emerald dot on variant tabs.
+ */
+function buildDiffersSet(
+  post: {
+    final_content?: string | null;
+    platform_versions?: Record<string, unknown> | null;
+  },
+  platforms: PlatformId[]
+): ReadonlySet<PlatformId> {
+  const set = new Set<PlatformId>();
+  const versions = (post.platform_versions ?? {}) as Record<
+    string,
+    { final_content?: string | null }
+  >;
+  for (const p of platforms) {
+    const v = versions[p];
+    if (!v) continue;
+    if ((v.final_content ?? "") !== (post.final_content ?? "")) {
+      set.add(p);
+    }
+  }
+  return set;
 }
