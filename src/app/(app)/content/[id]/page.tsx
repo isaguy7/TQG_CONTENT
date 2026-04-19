@@ -24,8 +24,10 @@ import { FigurePicker } from "@/components/FigurePicker";
 import { AmbientSuggestions } from "@/components/AmbientSuggestions";
 import { PostLabels } from "@/components/PostLabels";
 import { AiAssistantDrawer } from "@/components/AiAssistantDrawer";
+import { PostEditor } from "@/components/editor/PostEditor";
 import { useAiSidebarOpen } from "@/hooks/useLayoutToggles";
 import { Sparkles } from "lucide-react";
+import type { Editor as TiptapEditor } from "@tiptap/react";
 
 type PostStatus =
   | "idea"
@@ -39,6 +41,7 @@ type Post = {
   id: string;
   title: string | null;
   final_content: string | null;
+  content_json: unknown | null;
   status: PostStatus;
   platform: string;
   platforms?: string[] | null;
@@ -77,6 +80,7 @@ export default function PostEditorPage() {
   const [draft, setDraft] = useState("");
   const [corpusOpen, setCorpusOpen] = useState(false);
   const initialLoadDone = useRef(false);
+  const editorRef = useRef<TiptapEditor | null>(null);
 
   // Toggle state used by §9 (AI assistant sidebar rebuild). Currently a
   // no-op visually — the AiAssistantDrawer mounted below is the pre-V10
@@ -206,11 +210,30 @@ export default function PostEditorPage() {
   };
 
   const appendFromAssistant = (text: string) => {
-    setDraft((prev) => {
-      const next = prev ? `${prev}\n\n${text}` : text;
-      save({ final_content: next });
-      return next;
-    });
+    const ed = editorRef.current;
+    if (!ed) {
+      // Editor not yet mounted — fall back to plain-state append so AI
+      // insertions during the hydration window still land somewhere.
+      setDraft((prev) => {
+        const next = prev ? `${prev}\n\n${text}` : text;
+        save({ final_content: next });
+        return next;
+      });
+      return;
+    }
+    const hasExisting = ed.getText().trim().length > 0;
+    const paragraphs = text.split(/\n\s*\n/).filter((p) => p.trim().length > 0);
+    const nodes = paragraphs.map((para) => ({
+      type: "paragraph" as const,
+      content: [{ type: "text" as const, text: para.trim() }],
+    }));
+    const content = hasExisting
+      ? [{ type: "paragraph" as const }, ...nodes]
+      : nodes;
+    ed.chain().focus("end").insertContent(content).run();
+    const next = ed.getText();
+    setDraft(next);
+    save({ final_content: next });
   };
 
   const handleImageChange = (image_url: string | null, image_rationale: string | null) => {
@@ -403,16 +426,17 @@ export default function PostEditorPage() {
               "linear-gradient(180deg, rgba(255,245,230,0.018) 0%, rgba(255,255,255,0.022) 100%)",
           }}
         >
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={(e) => {
-              if (e.target.value !== (post.final_content || "")) {
-                save({ final_content: e.target.value });
+          <PostEditor
+            post={post}
+            onPlainTextChange={setDraft}
+            onBlur={(text) => {
+              if (text !== (post.final_content ?? "")) {
+                save({ final_content: text });
               }
             }}
-            placeholder="Write the post body here. This is the main thing on the page."
-            className="w-full bg-transparent border-0 text-[15px] text-white/90 placeholder-white/25 focus:outline-none min-h-[380px] leading-[1.8] resize-y tracking-[0.005em]"
+            onReady={(ed) => {
+              editorRef.current = ed;
+            }}
           />
 
           <div className="mt-5 pt-4 border-t border-white/[0.06]">
@@ -575,11 +599,28 @@ export default function PostEditorPage() {
             attachedHadithIds={attachedIds}
             onPickHookAngle={(text) => {
               save({ hook_selected: text });
-              if (!draft.trim()) {
-                setDraft(text + "\n\n");
-              } else {
-                setDraft(text + "\n\n" + draft);
+              const ed = editorRef.current;
+              if (!ed) {
+                const joined = draft.trim() ? `${text}\n\n${draft}` : `${text}\n\n`;
+                setDraft(joined);
+                save({ final_content: joined });
+                return;
               }
+              const hookNode = {
+                type: "paragraph" as const,
+                content: [{ type: "text" as const, text }],
+              };
+              const hadBody = ed.getText().trim().length > 0;
+              ed.chain()
+                .focus("start")
+                .insertContentAt(
+                  0,
+                  hadBody ? [hookNode, { type: "paragraph" as const }] : [hookNode]
+                )
+                .run();
+              const next = ed.getText();
+              setDraft(next);
+              save({ final_content: next });
             }}
             onAttachedHadith={loadPost}
             onAttachedAyah={loadPost}
