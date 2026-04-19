@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditorContent, type Editor } from "@tiptap/react";
 import type { JSONContent } from "@tiptap/core";
+import { History } from "lucide-react";
 import type { PlatformId } from "@/lib/platform-rules";
 import type { TiptapJson } from "@/types/post";
 import { usePostEditor, type PostEditorSource } from "./hooks/usePostEditor";
@@ -10,6 +11,7 @@ import { useAutosave, type SavePayload } from "./hooks/useAutosave";
 import { EditorToolbar } from "./EditorToolbar";
 import { CharacterCounter } from "./CharacterCounter";
 import { AutosaveStatus } from "./AutosaveStatus";
+import { VersionHistoryDialog } from "./VersionHistoryDialog";
 import {
   PlatformVariantTabs,
   type EditorVariant,
@@ -39,6 +41,7 @@ export interface PostEditorProps {
   post: PostEditorSource & {
     platforms?: PlatformId[] | null;
     platform_versions?: Record<string, unknown> | null;
+    version?: number | null;
   };
   /** Fires on every keystroke with the current plain-text content. */
   onPlainTextChange?: (text: string) => void;
@@ -67,6 +70,7 @@ export function PostEditor({
   const [activeVariant, setActiveVariant] =
     useState<EditorVariant>("canonical");
   const activeVariantRef = useRef<EditorVariant>("canonical");
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   // Per-variant in-memory working state. Canonical seeds from
   // post.content_json on editor ready; variants seed from
@@ -225,18 +229,65 @@ export function PostEditor({
           onChange={handleVariantChange}
           differsFromCanonical={differsFromCanonical}
         />
-        <AutosaveStatus
-          state={autosave.state}
-          onRetry={() => {
-            void autosave.flushSave();
-          }}
-        />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setHistoryOpen(true)}
+            aria-label="Post version history"
+            title="Version history"
+            className="flex items-center gap-1.5 rounded-lg p-2 text-[11px] text-white/55 hover:text-white/90 hover:bg-white/[0.06] transition-colors"
+          >
+            <History className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">History</span>
+          </button>
+          <AutosaveStatus
+            state={autosave.state}
+            onRetry={() => {
+              void autosave.flushSave();
+            }}
+          />
+        </div>
       </div>
       <EditorToolbar editor={editor} />
       <EditorContent editor={editor} />
       <div className="mt-3 pt-3 border-t border-white/[0.06] flex items-center justify-end">
         <CharacterCounter editor={editor} platform={primary} />
       </div>
+
+      <VersionHistoryDialog
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        postId={postId}
+        currentVersion={(post.version as number | null) ?? 0}
+        onRestore={({ json }) => {
+          // Natural fork-forward: setContent onto the canonical editor
+          // and let autosave write a new post_versions row with the
+          // restored content. Never deletes — restore appends.
+          editor.commands.setContent(json, { emitUpdate: false });
+          // After setContent with emitUpdate: false the editor's state
+          // is updated but onUpdate didn't fire. Trigger the save
+          // manually so the restored content lands in the DB + history.
+          autosave.triggerSave({
+            variant: "canonical",
+            text: editor.getText(),
+            html: editor.getHTML(),
+            json: editor.getJSON(),
+          });
+          // Flush immediately so the user sees "Saved just now" without
+          // waiting 3 seconds after closing the dialog.
+          void autosave.flushSave();
+          // Mirror the restored text back to the parent so downstream
+          // consumers (char counter, PublishPanel, etc.) reflect the
+          // restore without needing a blur.
+          onPlainTextChange?.(editor.getText());
+          // If the user was on a variant tab, a canonical restore means
+          // variants no longer diff-match their prior canonical comparison
+          // baseline. The autosave onServerUpdate will re-seed the
+          // differs set from server truth, so no local action needed
+          // here beyond the save itself.
+          setActiveVariant("canonical");
+        }}
+      />
     </div>
   );
 }
