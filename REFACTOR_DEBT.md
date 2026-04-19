@@ -57,16 +57,12 @@ as their relevant sections land.
 
 | Lines | Path | Planned split in |
 |------:|------|------------------|
-|  675  | `src/app/(app)/content/[id]/page.tsx` | **§5 (Tiptap editor rewrite — full replace)** |
 |  595  | `src/components/FigureContextPanel.tsx` | §6 (figure library) |
 |  592  | `src/lib/claude-api.ts` | §9 (AI assistant full rebuild) |
 |  586  | `src/components/HadithPanel.tsx` | §7 (hadith system) |
 |  586  | `src/components/FigureRefsPanel.tsx` | §6 (figure library) |
 |  586  | `src/app/(app)/content/page.tsx` | §4 (kanban at `/posts`) |
-
-The 675-line editor page is **intentionally excluded** from preemptive
-splitting — §5 rewrites it to Tiptap wholesale (W2-W3), so any partial
-split is wasted work.
+|  561  | `src/app/(app)/content/[id]/page.tsx` | trimmed from 743 in §5 commit 10; remaining mass is ambient-suggestion + figure-context inline handlers + metadata JSX. Further split during §9 AI rebuild (assistant handlers) or when `ConvertPreviews` + `AmbientSuggestions` get their own section rewrite. |
 
 ### SafeList wrapping candidates
 
@@ -154,4 +150,30 @@ decision rather than mechanical repaint.
 
 ## Resolved debt
 
-_empty — populate as items close_
+### V10 §5 post editor (2026-04-19)
+
+Replaced the plain `<textarea>` post editor with a full Tiptap-backed
+editor. 10 commits across content_json migration, Tiptap scaffold,
+toolbar + character counter + variant tabs, autosave + post_versions
+history, mentions + hashtags, version history dialog, copy-for-Typefully,
+and page shell cleanup.
+
+**Final stats:**
+- Bundle on `/content/[id]`: **276 kB first-load JS** (was 127 kB pre-§5,
+  +149 kB for Tiptap + ProseMirror + 5 extensions + Tippy)
+- `src/app/(app)/content/[id]/page.tsx`: **561 lines** (was 760 pre-§5,
+  −199 lines / 26% reduction)
+- New components (11 total) in `src/components/editor/`:
+  `PostEditor`, `EditorToolbar`, `CharacterCounter`,
+  `PlatformVariantTabs`, `AutosaveStatus`, `VersionHistoryDialog`,
+  `CopyForTypefullyButton`, `AttachedHadithPanel`,
+  `extensions/MentionFigure`, `extensions/MentionSuggestion`,
+  `extensions/HashtagMark`
+- New hooks: `hooks/usePostEditor`, `hooks/useAutosave`
+- New API route: `GET /api/posts/[id]/versions`
+- DB schema: `content_json JSONB` added to `posts` + `post_versions`
+  (migration `20260419160516_v10_post_content_json`)
+
+Commit sequence on `claude/implement-writer-app-tieYL`:
+`00fc5b3` → `a1229b4` → `2d6b235` → `e26bf4b` → `80a7948` → `27ee716` →
+`018f85a` → `da9581d` → `0ce94c4` → _commit 10_.

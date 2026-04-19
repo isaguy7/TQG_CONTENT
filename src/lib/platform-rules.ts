@@ -11,6 +11,12 @@ export type PlatformConfig = {
   id: PlatformId;
   label: string;
   charLimit: number;
+  /**
+   * Soft threshold — counter shifts amber here to warn the user they're
+   * approaching the hard limit. Distinct from optimalRange (engagement
+   * sweet spot, used by the AI hook generator and system prompt).
+   */
+  warnAt: number;
   visibleBefore: number;
   optimalRange: [number, number];
   hashtagAdvice: string;
@@ -23,6 +29,7 @@ export const PLATFORMS: Record<PlatformId, PlatformConfig> = {
     id: "linkedin",
     label: "LinkedIn",
     charLimit: 3000,
+    warnAt: 2700,
     visibleBefore: 210,
     optimalRange: [1800, 2100],
     hashtagAdvice: "3-5 hashtags at the end",
@@ -39,6 +46,7 @@ export const PLATFORMS: Record<PlatformId, PlatformConfig> = {
     id: "x",
     label: "X (Twitter)",
     charLimit: 280,
+    warnAt: 260,
     visibleBefore: 280,
     optimalRange: [71, 100],
     hashtagAdvice: "1-3 hashtags at end. Images don't count toward limit.",
@@ -56,6 +64,7 @@ export const PLATFORMS: Record<PlatformId, PlatformConfig> = {
     id: "instagram",
     label: "Instagram",
     charLimit: 2200,
+    warnAt: 2000,
     visibleBefore: 125,
     optimalRange: [100, 150],
     hashtagAdvice: "20-30 hashtags work here. Mix popular + niche.",
@@ -72,6 +81,7 @@ export const PLATFORMS: Record<PlatformId, PlatformConfig> = {
     id: "facebook",
     label: "Facebook",
     charLimit: 63206,
+    warnAt: 60000,
     visibleBefore: 477,
     optimalRange: [40, 80],
     hashtagAdvice: "1-2 hashtags max. Facebook isn't hashtag-driven.",

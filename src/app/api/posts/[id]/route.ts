@@ -59,8 +59,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   let body: {
     title?: string;
     final_content?: string | null;
+    content_html?: string | null;
+    content_json?: unknown;
     status?: "idea" | "draft" | "scheduled" | "published" | "failed" | "archived";
     platform?: string;
+    platform_versions?: Record<string, unknown>;
     figure_id?: string | null;
     hook_selected?: string | null;
     image_url?: string | null;
@@ -84,8 +87,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const writable: (keyof typeof body)[] = [
     "title",
     "final_content",
+    "content_html",
+    "content_json",
     "status",
     "platform",
+    "platform_versions",
     "figure_id",
     "hook_selected",
     "image_url",
@@ -104,7 +110,33 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     update.published_at = new Date().toISOString();
   }
 
+  // Heuristic — an "editor save" is any PATCH that carries canonical
+  // content_json (even null). Metadata-only updates (status, labels,
+  // scheduled_for, etc.) skip the version bump and post_versions insert.
+  // Variant saves push to platform_versions only; canonical content_*
+  // stays untouched so they also skip history (variants are overrides,
+  // not independent history streams).
+  const isEditorSave = Object.prototype.hasOwnProperty.call(
+    body,
+    "content_json"
+  );
+
   const db = createClient();
+
+  let currentVersion = 0;
+  let organizationId: string | null = null;
+  if (isEditorSave) {
+    const { data: pre } = await db
+      .from("posts")
+      .select("version, organization_id")
+      .eq("id", params.id)
+      .eq("user_id", auth.user.id)
+      .maybeSingle();
+    currentVersion = (pre?.version as number | null) ?? 0;
+    organizationId = (pre?.organization_id as string | null) ?? null;
+    update.version = currentVersion + 1;
+  }
+
   const { data, error } = await db
     .from("posts")
     .update(update)
@@ -115,6 +147,27 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (isEditorSave && organizationId) {
+    // Append to immutable history. Sequential after the UPDATE rather
+    // than wrapped in a transaction (supabase-js doesn't expose raw
+    // TXs); a failed insert here leaves posts.version ahead of the
+    // latest history row, which is recoverable on the next save.
+    const { error: versionErr } = await db.from("post_versions").insert({
+      post_id: params.id,
+      organization_id: organizationId,
+      version: currentVersion + 1,
+      content: body.final_content ?? null,
+      content_html: body.content_html ?? null,
+      content_json: body.content_json ?? null,
+      saved_by: auth.user.id,
+    });
+    if (versionErr) {
+      // Log only — never fail the PATCH. prune_post_versions will catch
+      // up on the next successful insert.
+      console.error("[posts PATCH] post_versions insert failed", versionErr);
+    }
   }
 
   if (body.status === "published") {
