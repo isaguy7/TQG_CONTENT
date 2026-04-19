@@ -24,6 +24,8 @@ import { FigurePicker } from "@/components/FigurePicker";
 import { AmbientSuggestions } from "@/components/AmbientSuggestions";
 import { PostLabels } from "@/components/PostLabels";
 import { AiAssistantDrawer } from "@/components/AiAssistantDrawer";
+import { useAiSidebarOpen } from "@/hooks/useLayoutToggles";
+import { Sparkles } from "lucide-react";
 
 type PostStatus =
   | "idea"
@@ -75,6 +77,12 @@ export default function PostEditorPage() {
   const [draft, setDraft] = useState("");
   const [corpusOpen, setCorpusOpen] = useState(false);
   const initialLoadDone = useRef(false);
+
+  // Toggle state used by §9 (AI assistant sidebar rebuild). Currently a
+  // no-op visually — the AiAssistantDrawer mounted below is the pre-V10
+  // surface and has its own open state; the new sidebar that reads this
+  // toggle lands in W5.
+  const [aiSidebarOpen, setAiSidebarOpen] = useAiSidebarOpen();
 
   const loadPost = useCallback(async () => {
     try {
@@ -289,6 +297,18 @@ export default function PostEditorPage() {
               {copyMsg}
             </span>
           ) : null}
+          {/* §9 plumbing: toggles the (not-yet-built) AI sidebar. Mounted
+              alongside AiAssistantDrawer until the drawer is removed in §9. */}
+          <button
+            type="button"
+            onClick={() => setAiSidebarOpen(!aiSidebarOpen)}
+            className="rounded-lg p-2 text-white/60 hover:text-white hover:bg-white/[0.06] transition-colors"
+            title={aiSidebarOpen ? "Hide AI assistant" : "Show AI assistant"}
+            aria-label="Toggle AI assistant"
+            aria-pressed={aiSidebarOpen}
+          >
+            <Sparkles className="w-4 h-4" />
+          </button>
           <AiAssistantDrawer
             postId={post.id}
             draft={draft}
