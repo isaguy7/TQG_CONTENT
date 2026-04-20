@@ -1,223 +1,284 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { Plus, Search } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
-import { SafeList, ListSkeleton } from "@/components/shared/SafeList";
+import { ListSkeleton } from "@/components/shared/SafeList";
 import { cn } from "@/lib/utils";
+import type { FigureType, IslamicFigureWithCounts } from "@/types/figure";
 
-type Figure = {
-  id: string;
-  name_en: string;
-  name_ar: string | null;
-  title: string | null;
-  type: "sahabi" | "prophet" | "scholar" | "tabii";
-  era: string | null;
-  bio_short: string;
-  themes: string[];
-  quran_refs: string[];
-  posts_written: number;
-  last_posted_at: string | null;
-  hadith_ref_count: number;
-  quran_ref_count: number;
-};
+type TypeFilter = "all" | FigureType;
+type SortKey = "name" | "posts" | "recent";
 
-const TYPE_LABEL: Record<Figure["type"], string> = {
+const TYPE_LABEL: Record<FigureType, string> = {
   sahabi: "Sahabi",
   prophet: "Prophet",
   scholar: "Scholar",
   tabii: "Tabi'i",
 };
 
-const TYPE_COLOR: Record<Figure["type"], string> = {
-  sahabi: "bg-emerald-500/15 text-emerald-200 border-emerald-400/30",
-  prophet: "bg-amber-500/15 text-amber-200 border-amber-400/30",
-  scholar: "bg-sky-500/15 text-sky-200 border-sky-400/30",
-  tabii: "bg-violet-500/15 text-violet-200 border-violet-400/30",
+// Plural forms for the filter chips (15 sahabah reads better than
+// 15 sahabi). Chip counts only — body text uses TYPE_LABEL.
+const TYPE_PLURAL: Record<FigureType, string> = {
+  sahabi: "Sahabah",
+  prophet: "Prophets",
+  scholar: "Scholars",
+  tabii: "Tabi'in",
 };
 
-// Type-keyed 4px left border on each card. Using raw rgba so the class
-// survives Tailwind's tree-shaker without needing arbitrary values on
-// border-* that would be harder to tweak later.
-const TYPE_BORDER: Record<Figure["type"], string> = {
-  sahabi: "#10b981", // emerald-500
-  prophet: "#f59e0b", // amber-500
-  scholar: "#0ea5e9", // sky-500
-  tabii: "#8b5cf6", // violet-500
+const TYPE_PILL: Record<FigureType, string> = {
+  sahabi: "bg-green-500/10 text-green-400 border-green-500/20",
+  prophet: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  scholar: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+  tabii: "bg-amber-500/10 text-amber-400 border-amber-500/20",
 };
 
-const TYPE_HEADER_GRADIENT: Record<Figure["type"], string> = {
-  sahabi:
-    "linear-gradient(135deg, rgba(16,185,129,0.12) 0%, transparent 70%)",
-  prophet:
-    "linear-gradient(135deg, rgba(245,158,11,0.12) 0%, transparent 70%)",
-  scholar:
-    "linear-gradient(135deg, rgba(14,165,233,0.12) 0%, transparent 70%)",
-  tabii:
-    "linear-gradient(135deg, rgba(139,92,246,0.12) 0%, transparent 70%)",
+const SORT_LABEL: Record<SortKey, string> = {
+  name: "Name (A–Z)",
+  posts: "Most posts",
+  recent: "Recently added",
 };
 
 export default function FiguresPage() {
-  const [figures, setFigures] = useState<Figure[] | null>(null);
-  const [filter, setFilter] = useState<"all" | Figure["type"]>("all");
+  const [figures, setFigures] = useState<IslamicFigureWithCounts[] | null>(null);
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<SortKey>("name");
+  const deferredQuery = useDeferredValue(query);
 
   useEffect(() => {
     fetch("/api/figures")
       .then((r) => r.json())
-      .then((j) => setFigures(j.figures || []))
+      .then((j) => setFigures((j.figures as IslamicFigureWithCounts[]) || []))
       .catch(() => setFigures([]));
   }, []);
 
-  const filtered = (figures || []).filter((f) => {
-    if (filter !== "all" && f.type !== filter) return false;
-    if (query.trim()) {
-      const q = query.toLowerCase();
-      if (
-        !f.name_en.toLowerCase().includes(q) &&
-        !(f.name_ar || "").includes(query.trim()) &&
-        !(f.title || "").toLowerCase().includes(q)
-      ) {
-        return false;
-      }
+  // Counts per type — always computed from the full (pre-filter) set so
+  // chip labels stay stable as the user narrows the view.
+  const typeCounts = useMemo(() => {
+    const out: Record<TypeFilter, number> = {
+      all: 0,
+      sahabi: 0,
+      prophet: 0,
+      scholar: 0,
+      tabii: 0,
+    };
+    if (!figures) return out;
+    out.all = figures.length;
+    for (const f of figures) out[f.type] += 1;
+    return out;
+  }, [figures]);
+
+  const filtered = useMemo(() => {
+    if (!figures) return [];
+    const q = deferredQuery.trim().toLowerCase();
+    const qRaw = deferredQuery.trim();
+    const list = figures.filter((f) => {
+      if (typeFilter !== "all" && f.type !== typeFilter) return false;
+      if (!q) return true;
+      if (f.name_en.toLowerCase().includes(q)) return true;
+      if ((f.name_ar ?? "").includes(qRaw)) return true;
+      if ((f.title ?? "").toLowerCase().includes(q)) return true;
+      if (f.themes.some((t) => t.toLowerCase().includes(q))) return true;
+      return false;
+    });
+    const sorted = [...list];
+    if (sort === "name") {
+      sorted.sort((a, b) => a.name_en.localeCompare(b.name_en));
+    } else if (sort === "posts") {
+      sorted.sort((a, b) => b.post_count - a.post_count);
+    } else if (sort === "recent") {
+      sorted.sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
     }
-    return true;
-  });
+    return sorted;
+  }, [figures, deferredQuery, typeFilter, sort]);
+
+  const clearFilters = () => {
+    setQuery("");
+    setTypeFilter("all");
+  };
+
+  const anyFiltersActive = typeFilter !== "all" || query.trim().length > 0;
 
   return (
     <PageShell
       title="Islamic Figures"
-      description="Sahabah, prophets, scholars, tabi'in — with linked hadith and Quran refs"
+      description="Sahabah, prophets, scholars, tabi'in — browse and search"
+      actions={
+        <Link
+          href="/figures/new"
+          className="inline-flex items-center gap-1.5 rounded-md bg-[#1B5E20] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[#154d19] transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Add figure
+        </Link>
+      }
     >
       <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search figures…"
-            className="flex-1 bg-transparent border border-white/[0.08] rounded px-3 py-1.5 text-[13px] text-white/85 focus:outline-none focus:border-white/[0.2]"
-          />
-          <div className="flex gap-1">
-            {(["all", "sahabi", "prophet", "scholar", "tabii"] as const).map(
-              (t) => (
-                <button
-                  key={t}
-                  onClick={() => setFilter(t)}
-                  className={cn(
-                    "px-2.5 py-1 rounded text-[11px] border transition-colors",
-                    filter === t
-                      ? "bg-white/[0.08] border-white/20 text-white/90"
-                      : "bg-transparent border-white/[0.08] text-white/50 hover:text-white/80"
-                  )}
-                >
-                  {t === "all" ? "All" : TYPE_LABEL[t]}
-                </button>
-              )
-            )}
+        {/* Search + sort */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative flex-1 max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search figures by name or theme…"
+              className="w-full rounded-md border border-zinc-800 bg-zinc-900 py-1.5 pl-9 pr-3 text-[13px] text-white placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-[#1B5E20] focus:border-[#1B5E20]"
+            />
           </div>
+          <label className="flex items-center gap-2 text-[12px] text-zinc-400 sm:ml-auto">
+            <span className="hidden sm:inline">Sort:</span>
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortKey)}
+              className="rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-[12px] text-white focus:outline-none focus:ring-1 focus:ring-[#1B5E20]"
+            >
+              {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+                <option key={k} value={k}>
+                  {SORT_LABEL[k]}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
+        {/* Type chips with counts */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <TypeChip
+            active={typeFilter === "all"}
+            onClick={() => setTypeFilter("all")}
+            label={`All (${typeCounts.all})`}
+          />
+          {(["sahabi", "prophet", "scholar", "tabii"] as const).map((t) =>
+            typeCounts[t] > 0 ? (
+              <TypeChip
+                key={t}
+                active={typeFilter === t}
+                onClick={() => setTypeFilter(t)}
+                label={`${TYPE_PLURAL[t]} (${typeCounts[t]})`}
+              />
+            ) : null
+          )}
+        </div>
+
+        {/* Cards */}
         {figures === null ? (
           <ListSkeleton />
-        ) : (
-          <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <SafeList
-              data={filtered}
-              empty={
-                <li className="col-span-full text-[13px] text-white/40">
-                  No figures match.
-                </li>
-              }
-              keyFn={(f) => f.id}
+        ) : filtered.length === 0 && anyFiltersActive ? (
+          <div className="py-12 text-center">
+            <p className="text-[13px] text-zinc-400">
+              No figures match your filters.
+            </p>
+            <button
+              onClick={clearFilters}
+              className="mt-2 text-[12px] text-[#4CAF50] hover:underline"
             >
-              {(f) => {
-                const needsRefs =
-                  f.hadith_ref_count === 0 && f.quran_ref_count === 0;
-                return (
-                  <li key={f.id}>
-                  <Link
-                    href={`/figures/${f.id}`}
-                    className="card-interactive block rounded-xl bg-white/[0.03] border border-white/[0.06] overflow-hidden shadow-lg shadow-black/10"
-                    style={{
-                      borderLeft: `4px solid ${TYPE_BORDER[f.type]}`,
-                    }}
-                  >
-                    <div
-                      className="p-4"
-                      style={{ background: TYPE_HEADER_GRADIENT[f.type] }}
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="min-w-0">
-                          <div className="text-[14px] font-semibold text-white/90 truncate">
-                            {f.name_en}
-                          </div>
-                          {f.name_ar ? (
-                            <div
-                              dir="rtl"
-                              className="text-[13px] text-white/60 mt-0.5"
-                            >
-                              {f.name_ar}
-                            </div>
-                          ) : null}
-                        </div>
-                        <span
-                          className={cn(
-                            "px-2 py-0.5 rounded-full border text-[10px] uppercase tracking-wider shrink-0",
-                            TYPE_COLOR[f.type]
-                          )}
-                        >
-                          {TYPE_LABEL[f.type]}
-                        </span>
-                      </div>
-                      {f.title ? (
-                        <div className="text-[11px] text-white/50 mb-2">
-                          {f.title}
-                        </div>
-                      ) : null}
-                      <div className="text-[12px] text-white/65 line-clamp-2 leading-relaxed">
-                        {f.bio_short}
-                      </div>
-                    </div>
-                    <div className="px-4 pb-4 pt-3 border-t border-white/[0.05] flex items-center gap-2 flex-wrap">
-                      {needsRefs ? (
-                        <span className="text-[11px] text-white/35 italic">
-                          No references yet
-                        </span>
-                      ) : (
-                        <>
-                          {f.quran_ref_count > 0 ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.05] border border-white/[0.06] text-[11px] tabular-nums">
-                              <span className="text-white/95 font-semibold">
-                                {f.quran_ref_count}
-                              </span>
-                              <span className="text-white/55">Quran</span>
-                            </span>
-                          ) : null}
-                          {f.hadith_ref_count > 0 ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.05] border border-white/[0.06] text-[11px] tabular-nums">
-                              <span className="text-white/95 font-semibold">
-                                {f.hadith_ref_count}
-                              </span>
-                              <span className="text-white/55">Hadith</span>
-                            </span>
-                          ) : null}
-                        </>
-                      )}
-                      {f.posts_written > 0 ? (
-                        <span className="ml-auto text-[11px] text-white/55">
-                          {f.posts_written} post
-                          {f.posts_written === 1 ? "" : "s"}
-                        </span>
-                      ) : null}
-                    </div>
-                  </Link>
-                </li>
-                );
-              }}
-            </SafeList>
+              Clear filters
+            </button>
+          </div>
+        ) : figures.length === 0 ? (
+          <div className="py-12 text-center text-[13px] text-zinc-500">
+            No figures yet. Click <span className="text-white/80">Add figure</span> to seed the library.
+          </div>
+        ) : (
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((f) => (
+              <li key={f.id}>
+                <FigureCard figure={f} />
+              </li>
+            ))}
           </ul>
         )}
       </div>
     </PageShell>
+  );
+}
+
+function TypeChip({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "rounded-full border px-3 py-1 text-[11px] font-medium transition-colors",
+        active
+          ? "bg-[#1B5E20] border-[#1B5E20] text-white"
+          : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+function FigureCard({ figure: f }: { figure: IslamicFigureWithCounts }) {
+  const themesShown = f.themes.slice(0, 3);
+  const themesExtra = f.themes.length - themesShown.length;
+
+  return (
+    <Link
+      href={`/figures/${f.slug}`}
+      className="block rounded-lg border border-zinc-800 bg-zinc-900 p-4 hover:border-zinc-700 transition-colors"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate font-semibold text-white">{f.name_en}</div>
+          {f.name_ar ? (
+            <div
+              dir="rtl"
+              className="mt-0.5 text-sm text-zinc-400 truncate"
+            >
+              {f.name_ar}
+            </div>
+          ) : null}
+        </div>
+        <span
+          className={cn(
+            "shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium",
+            TYPE_PILL[f.type]
+          )}
+        >
+          {TYPE_LABEL[f.type]}
+        </span>
+      </div>
+
+      {themesShown.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-1">
+          {themesShown.map((theme) => (
+            <span
+              key={theme}
+              className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400"
+            >
+              {theme}
+            </span>
+          ))}
+          {themesExtra > 0 ? (
+            <span className="text-xs text-zinc-500 self-center">
+              +{themesExtra}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="mt-3 text-xs text-zinc-500">
+        {f.post_count === 0
+          ? "No posts yet"
+          : f.post_count === 1
+            ? "1 post"
+            : `${f.post_count} posts`}
+      </div>
+    </Link>
   );
 }
