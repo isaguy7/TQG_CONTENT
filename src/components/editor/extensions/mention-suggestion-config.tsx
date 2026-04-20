@@ -49,7 +49,10 @@ export const mentionSuggestionConfig: Omit<
   SuggestionOptions<FigureSuggestionItem>,
   "editor"
 > = {
-  char: "@",
+  // '*' trigger for Islamic figures (sahabah, prophets, scholars).
+  // '@' is reserved for future platform-mention support (tagging
+  // real users on LinkedIn/X); see §10-§12 adapters.
+  char: "*",
   items: async ({ query }) => {
     const all = await fetchFigures();
     return filterFigures(all, query);
