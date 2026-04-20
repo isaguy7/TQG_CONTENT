@@ -49,6 +49,46 @@ Or cherry-pick the inverse of the archival commit.
 
 ## Active debt
 
+### Dual-surface /api/figures route
+
+Identified 2026-04-20 during V10 §6 commit 4.
+
+Both `src/app/api/figures/[id]/route.ts` (uuid-keyed) and
+`src/app/api/figures/by-slug/[slug]/route.ts` (slug-keyed) exist in
+parallel. The commit 4 spec originally called for deleting the `[id]`
+route; grepping the codebase revealed 5 consumers still fetching
+figures via `post.figure_id` UUID — deleting would cascade into the
+editor and the reference panels. Kept both routes instead.
+
+The slug-keyed route is nested under a static `by-slug/` parent
+rather than at the `/api/figures/[slug]` URL originally spec'd:
+Next.js disallows two different dynamic-segment names (`[id]` and
+`[slug]`) as siblings at the same level. Putting the slug route one
+level deeper is the minimal-touch fix; alternative would have been
+renaming `[id]` + migrating all 5 consumers.
+
+**`[id]` consumers (uuid-keyed):**
+- `src/components/FigureContextPanel.tsx` (figure metadata fetch inside
+  the editor's right-side context panel)
+- `src/components/FigureRefsPanel.tsx` (quran/hadith ref CRUD for the
+  figure editor experience)
+- `src/components/FigureAvailableRefs.tsx` (available refs dropdown)
+- `src/components/QuranBrowser.tsx` (adds verses to a figure)
+- `src/app/(app)/content/[id]/page.tsx` (loads figure by
+  `post.figure_id` for editor display)
+
+Plus sub-routes under `[id]/hadith/*` and `[id]/quran/*` consumed by
+the same set.
+
+**`[slug]` consumer (new):**
+- `src/app/(app)/figures/[slug]/page.tsx` (§6 detail page)
+
+**Migration path:** when §7 (hadith picker) and §8 (quran browser)
+refactor their figure-attachment flows, swap their uuid fetches to
+slug-keyed calls. At that point the `[id]` route and its sub-routes
+can be deleted. Not urgent; routes don't conflict and the duplication
+is purely read-layer.
+
 ### Native browser-dialog call sites
 
 Identified 2026-04-19 during V10 §6 commit 2. `V10_Product_Context.md`
