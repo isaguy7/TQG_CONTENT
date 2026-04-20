@@ -49,6 +49,29 @@ Or cherry-pick the inverse of the archival commit.
 
 ## Active debt
 
+### Native browser-dialog call sites
+
+Identified 2026-04-19 during V10 §6 commit 2. `V10_Product_Context.md`
+added a UX rule forbidding `window.confirm` / `window.prompt` /
+`window.alert`. `ConfirmDialog` + `InputDialog` shipped in
+`src/components/shared/` as the replacement primitives; the sites
+below still use native dialogs and need migration as their sections
+are touched.
+
+| File | Line | Type | Planned migration |
+|------|-----:|------|-------------------|
+| `src/app/(app)/content/[id]/page.tsx` | 169 | `confirm` (soft delete draft) | §10 cleanup or §5 follow-up |
+| `src/app/(app)/content/page.tsx` | 129 | `confirm` | §4 kanban rewrite |
+| `src/app/(app)/content/page.tsx` | 163 | `confirm` (permanent delete from trash) | §4 kanban rewrite |
+| `src/app/(app)/hadith/page.tsx` | 51 | `confirm` (delete hadith row) | §7 hadith system rewrite |
+| `src/components/FigureRefsPanel.tsx` | 165 | `confirm` (remove ayah ref) | §6 later commit / §8 quran rewrite |
+| `src/components/FigureRefsPanel.tsx` | 416 | `confirm` (remove hadith ref) | §6 later commit / §7 hadith rewrite |
+| `src/components/editor/EditorToolbar.tsx` | 42 | `window.prompt` (link URL) | §5 follow-up — swap `window.prompt` for `InputDialog` |
+
+**First consumer of the new primitives:** §6 commit 5 (figure delete
+flow). Migrate the rest opportunistically — no standalone migration
+pass needed; they'll get touched as their owning sections rewrite.
+
 ### Files over 500 lines
 
 Identified 2026-04-18 during V10 M1 §1 inventory. Large files are harder to
