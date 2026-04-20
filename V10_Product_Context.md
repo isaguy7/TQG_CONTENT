@@ -140,26 +140,40 @@ NEXT_PUBLIC_X_MODE=typefully | direct | disabled
 
 **Direct posting IS the long-term product. Typefully is transitional.** Do not let Typefully-as-bridge calcify into Typefully-as-permanent-architecture.
 
-### Unified post history — view all posts ever published (M2/§13)
+### M1 scope lock — Typefully ONLY (no direct LinkedIn/X)
 
-**Decision date:** April 19, 2026 (during §5 smoke test)
+**Decision date:** April 20, 2026
 
-**What Isa wants:** `/content` shows drafts + ideas + scheduled (pre-publish). `/calendar` (existing) shows a full post history view — every tweet, every LinkedIn post, every Facebook/Instagram post Isa has ever made — pulled from Typefully, LinkedIn API, and X API. Blend with scheduled queue so creators see: "What I've done, what's coming up, what I'm drafting."
+**Why:** LinkedIn Community Management API review timeline is 1-4 weeks and unpredictable. Building + testing + verifying direct adapters during M1 adds uncertainty and delays ship without meaningful user value (Typefully handles scheduling + publishing well today). Accept the Typefully-only path for launch; activate direct adapters in M2 when review has landed and there's breathing room to test properly.
 
-**Implementation path (§13 calendar + §10-§12 platform adapters):**
+**What this means for M1:**
+- **TypefullyAdapter** active from §10 forward
+- **LinkedInAdapter** remains dormant skeleton — env flag `NEXT_PUBLIC_LINKEDIN_MODE=typefully` default, `=direct` becomes available in M2
+- **XAdapter** remains dormant skeleton — same pattern, env flag for M2 flip
+- No LinkedIn OAuth in M1 (consistent with earlier decision — LinkedIn Community Management app can't coexist with Sign In with LinkedIn on the same app anyway)
+- No X OAuth writes in M1 (X read-OAuth is already working per memory; we just don't use it to push content)
+- **All publishing** flows copy-paste or Typefully API push
 
-1. New DB table `published_posts` (or similar name) — local mirror of what's on each platform. Columns: platform, platform_post_id, published_at, content, metrics (likes/comments/impressions as available), raw_response jsonb.
-2. Ingestion worker per adapter. Runs on a schedule (daily?), hits each platform's API, upserts into `published_posts`.
-   - TypefullyAdapter.fetchQueue() — scheduled + recently published from Typefully v2 API
-   - LinkedInAdapter.fetchHistory() — once Community Management review completes, paginated historical fetch
-   - XAdapter.fetchHistory() — once direct mode is on, paginated from X API v2
-3. Initial backfill — one-off ingestion script for "every post ever" (paginate to the API's limit)
-4. Incremental update — nightly cron or on-demand refresh button
-5. `/calendar` gains a second view mode: timeline showing scheduled items (from platform queues) + published items (from mirror). Group by date.
+**Why this is safe:** app architecture is already adapter-based. Activating direct adapters in M2 is a small change (env flag flip + route wiring) once API reviews land. No architectural rework needed.
 
-**What this is NOT:** a real-time API call each page load. Rate limits would kill that. The mirror table makes the page fast + Typefully/LinkedIn/X APIs only hit on schedule.
+### Unified post history — M1 scope is Typefully-only
 
-**Not on M1 critical path.** M1 ships with copy-for-Typefully as the publish handoff. Unified history view ships in W6-W7 alongside platform adapters.
+**Decision date:** April 19, 2026, updated April 20, 2026
+
+**M1 delivers:**
+- `/calendar` shows Typefully queue: drafts, scheduled, recently published from Typefully v2 API
+- One ingestion worker (TypefullyAdapter.fetchQueue()) runs on schedule or on-demand refresh
+- Local mirror table `published_posts` stores Typefully-sourced items
+- Blend with `posts` (drafts) for the "what I've done / what's coming / what I'm drafting" unified view
+- LinkedIn/X APIs NOT hit in M1
+
+**M2 (deferred):**
+- LinkedInAdapter.fetchHistory() — once Community Management review lands
+- XAdapter.fetchHistory() — once direct mode activates
+- Historical backfill scripts for LinkedIn/X
+- Incremental sync cron across all three platforms
+
+**Why split:** same reason as direct adapters — LinkedIn/X API reliability during M1 testing is unknown; Typefully is the known-good path; launch without external blockers.
 
 ### LinkedIn Community Management API
 
@@ -175,6 +189,30 @@ NEXT_PUBLIC_X_MODE=typefully | direct | disabled
 - Or: keep Community Management as the sole LinkedIn integration, post only to TQG page, personal posts stay copy-paste
 
 **Not on M1 critical path.** M1 ships regardless of LinkedIn review outcome.
+
+### UX principles — no native browser dialogs
+
+**Decision date:** April 19, 2026
+
+**Rule:** `window.confirm()`, `window.prompt()`, and `window.alert()` are forbidden. All confirmations, prompts, and alerts must be in-app modals, toasts, or inline UI.
+
+**Why:**
+- Native dialogs look inconsistent across browsers (Firefox ≠ Chrome ≠ Safari)
+- Can't be styled to match TQG brand
+- Break keyboard focus handling
+- Mobile browsers render them differently again
+- They feel like "old web" — incongruent with the polished editor feel
+
+**Pattern to use instead:**
+- **Confirmations** (delete, discard changes, destructive ops): reusable `<ConfirmDialog>` component with dark card, action button in danger tone, cancel as secondary
+- **Prompts** (URL entry, naming): reusable `<InputDialog>` component with labeled text input, submit/cancel buttons
+- **Alerts / notifications**: toast system or inline error banner (no library — implement with React state + CSS animation when needed)
+
+**Known violations to fix as encountered:**
+- `src/components/editor/EditorToolbar.tsx` — link button uses `window.prompt()` for URL input. Replace with `<InputDialog>` in a future editor polish pass or when §6+ touches it.
+- Any delete confirmations that use `window.confirm()` — replace during each section that touches them.
+
+**Implementation:** build `ConfirmDialog` + `InputDialog` as shared primitives in `src/components/shared/` the first time a new section needs them. Subsequent sections reuse.
 
 ### Hadith safety (non-negotiable, product-level)
 
