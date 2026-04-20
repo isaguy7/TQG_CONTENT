@@ -65,7 +65,7 @@ Companion docs:
 
 **KEEP TQG-specific:**
 - TQG green (`#1B5E20`) — brand color is for TQG (the org), not the product; stays even if product renames
-- Default organization name seeded for Isa: "The Quran Group"
+- Default organization name seeded for Isa: "Isa Khan's Workspace" (slug `isa-khan-workspace`). Personal-workspace pattern, not shared TQG-team org — workspaces are per-user in this model. A separate TQG team org can be created later via invite flow if needed.
 - Isa's support email and personal branding
 - `thequrangroup.com` domain usage
 
@@ -140,6 +140,27 @@ NEXT_PUBLIC_X_MODE=typefully | direct | disabled
 
 **Direct posting IS the long-term product. Typefully is transitional.** Do not let Typefully-as-bridge calcify into Typefully-as-permanent-architecture.
 
+### Unified post history — view all posts ever published (M2/§13)
+
+**Decision date:** April 19, 2026 (during §5 smoke test)
+
+**What Isa wants:** `/content` shows drafts + ideas + scheduled (pre-publish). `/calendar` (existing) shows a full post history view — every tweet, every LinkedIn post, every Facebook/Instagram post Isa has ever made — pulled from Typefully, LinkedIn API, and X API. Blend with scheduled queue so creators see: "What I've done, what's coming up, what I'm drafting."
+
+**Implementation path (§13 calendar + §10-§12 platform adapters):**
+
+1. New DB table `published_posts` (or similar name) — local mirror of what's on each platform. Columns: platform, platform_post_id, published_at, content, metrics (likes/comments/impressions as available), raw_response jsonb.
+2. Ingestion worker per adapter. Runs on a schedule (daily?), hits each platform's API, upserts into `published_posts`.
+   - TypefullyAdapter.fetchQueue() — scheduled + recently published from Typefully v2 API
+   - LinkedInAdapter.fetchHistory() — once Community Management review completes, paginated historical fetch
+   - XAdapter.fetchHistory() — once direct mode is on, paginated from X API v2
+3. Initial backfill — one-off ingestion script for "every post ever" (paginate to the API's limit)
+4. Incremental update — nightly cron or on-demand refresh button
+5. `/calendar` gains a second view mode: timeline showing scheduled items (from platform queues) + published items (from mirror). Group by date.
+
+**What this is NOT:** a real-time API call each page load. Rate limits would kill that. The mirror table makes the page fast + Typefully/LinkedIn/X APIs only hit on schedule.
+
+**Not on M1 critical path.** M1 ships with copy-for-Typefully as the publish handoff. Unified history view ships in W6-W7 alongside platform adapters.
+
 ### LinkedIn Community Management API
 
 **Current status:** Old app deleted. New app created with Community Management API only. Review pending (1–4 weeks for CICs).
@@ -200,6 +221,30 @@ Haiku (slop checks):      claude-haiku-4-5-20251001
 **Process rule for future sessions:** before writing any migration, run `list_tables(schemas=['public'], verbose=true)` via Supabase MCP. Before trusting tenant boundaries, run `get_advisors(type='security')`. Don't rely on plan docs or prior memory to describe schema — they drift.
 
 ---
+
+### Email / invite sender (locked)
+
+**Decision date:** April 19, 2026
+
+**Sender address:** `studio@thequrangroup.com`
+- Product-specific subdomain-less local-part
+- Separates product mail from TQG org mail (`hello@`, `info@`)
+- Survives eventual product rename (mailbox stays, forwarding rules adjust)
+- Implementation: set up as an alias forwarding to existing TQG inbox for M1; promote to dedicated mailbox at M3 public launch
+
+**Display name:** "The Quran Group Studio"
+- Generic brand voice, not per-inviter
+- Consistent across all orgs (doesn't get weird when there are 30 orgs)
+- `invited_by` context surfaces in email body, not sender field
+
+**Subject template:** "You've been invited to join {{org_name}}"
+
+**Body template principle:** inviter name + org name + accept CTA + 7-day expiry notice + brand footer. Full template drafted in W8 when §0.2 invite flow is built.
+
+**Resend setup:**
+- Sending domain: `thequrangroup.com` (DNS verification: SPF, DKIM, DMARC)
+- API key name convention: "TQG Content Studio — Development" (M1) and "TQG Content Studio — Production" (M3+). Separate keys, rotate independently.
+- Env var name: `RESEND_API_KEY`
 
 ### Writing voice rules (in system prompts)
 
