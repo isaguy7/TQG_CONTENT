@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/admin";
 import { recordPublished } from "@/lib/gap-alerts";
 import { isUuid } from "@/lib/utils";
 import { requireUser } from "@/lib/auth";
+import { checkPublishGate } from "@/lib/publish-gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -110,6 +111,23 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     update.published_at = new Date().toISOString();
   }
 
+  const db = createClient();
+
+  // Publish-gate — refuse status transitions to scheduled/published
+  // when the post has unverified hadith refs. Checked before the
+  // UPDATE so a blocked transition never mutates the row. M1 reality:
+  // corpus picker auto-verifies, so the gate is always pass for
+  // in-spec flows; this is defense-in-depth for §9's AI suggestions.
+  if (body.status === "scheduled" || body.status === "published") {
+    const gate = await checkPublishGate(db, params.id);
+    if (!gate.ready_to_publish) {
+      return NextResponse.json(
+        { error: "PUBLISH_GATE_BLOCKED", blockers: gate.blockers },
+        { status: 400 }
+      );
+    }
+  }
+
   // Heuristic — an "editor save" is any PATCH that carries canonical
   // content_json (even null). Metadata-only updates (status, labels,
   // scheduled_for, etc.) skip the version bump and post_versions insert.
@@ -120,8 +138,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     body,
     "content_json"
   );
-
-  const db = createClient();
 
   let currentVersion = 0;
   let organizationId: string | null = null;

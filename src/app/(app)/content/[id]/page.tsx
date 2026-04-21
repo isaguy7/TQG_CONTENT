@@ -71,6 +71,13 @@ export default function PostEditorPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  // Publish-gate result — drives disabled state on scheduled/published
+  // options in the status dropdown. Refetched after hadith attach/detach
+  // via loadPost().
+  const [publishCheck, setPublishCheck] = useState<{
+    ready_to_publish: boolean;
+    blockers: Array<{ code: string; count: number; message: string }>;
+  } | null>(null);
   const [copyMsg, setCopyMsg] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const initialLoadDone = useRef(false);
@@ -84,10 +91,18 @@ export default function PostEditorPage() {
 
   const loadPost = useCallback(async () => {
     try {
-      const [postRes, hadithRes] = await Promise.all([
+      const [postRes, hadithRes, publishRes] = await Promise.all([
         fetch(`/api/posts/${postId}`),
         fetch("/api/hadith"),
+        fetch(`/api/posts/${postId}/publish-check`).catch(() => null),
       ]);
+      if (publishRes && publishRes.ok) {
+        const result = (await publishRes.json()) as {
+          ready_to_publish: boolean;
+          blockers: Array<{ code: string; count: number; message: string }>;
+        };
+        setPublishCheck(result);
+      }
       if (!postRes.ok) throw new Error(`Post ${postRes.status}`);
       const { post, hadith_refs } = (await postRes.json()) as {
         post: Post;
@@ -135,8 +150,15 @@ export default function PostEditorPage() {
         body: JSON.stringify(patch),
       });
       if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as { error?: string };
-        setSaveMsg(`Save failed: ${err.error || res.status}`);
+        const err = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          blockers?: Array<{ message: string }>;
+        };
+        if (err.error === "PUBLISH_GATE_BLOCKED" && err.blockers?.length) {
+          setSaveMsg(`Blocked: ${err.blockers[0].message}`);
+        } else {
+          setSaveMsg(`Save failed: ${err.error || res.status}`);
+        }
         return;
       }
       const { post } = (await res.json()) as { post: Post };
@@ -428,12 +450,41 @@ export default function PostEditorPage() {
               >
                 <option value="idea">idea</option>
                 <option value="draft">draft</option>
-                <option value="scheduled">scheduled</option>
-                <option value="published">published</option>
+                <option
+                  value="scheduled"
+                  disabled={publishCheck?.ready_to_publish === false}
+                  title={
+                    publishCheck?.ready_to_publish === false
+                      ? publishCheck.blockers[0]?.message
+                      : undefined
+                  }
+                >
+                  scheduled
+                </option>
+                <option
+                  value="published"
+                  disabled={publishCheck?.ready_to_publish === false}
+                  title={
+                    publishCheck?.ready_to_publish === false
+                      ? publishCheck.blockers[0]?.message
+                      : undefined
+                  }
+                >
+                  published
+                </option>
                 <option value="failed">failed</option>
                 <option value="archived">archived</option>
               </select>
             </label>
+            {publishCheck?.ready_to_publish === false &&
+            publishCheck.blockers.length > 0 ? (
+              <span
+                className="text-[11px] text-amber-400"
+                title={publishCheck.blockers.map((b) => b.message).join(" · ")}
+              >
+                ⚠ {publishCheck.blockers[0].message}
+              </span>
+            ) : null}
             <div className="flex-1" />
           </div>
 
@@ -543,6 +594,7 @@ export default function PostEditorPage() {
         />
 
         <AttachedHadithPanel
+          postId={postId}
           attached={attached}
           availableHadith={availableHadith}
           onAttach={attachHadith}

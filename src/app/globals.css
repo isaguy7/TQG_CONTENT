@@ -100,3 +100,60 @@
     left: 100%;
   }
 }
+
+/* Tiptap editor — list, blockquote, and link styling.
+   Tailwind's preflight strips default list-marker / blockquote / link
+   styling. We don't have @tailwindcss/typography installed, so the
+   `prose` classes on the editor wrapper are no-op. Re-apply these
+   minimal styles so toggleBulletList / toggleOrderedList / toggleBlockquote
+   produce visible output, and so links render blue-and-underlined
+   instead of blending into body text.
+
+   Scoped to the two Tiptap surfaces (live editor + read-only version
+   preview) so the rules don't bleed into other <ul>/<a> elsewhere. */
+.tiptap-post-editor ul,
+.tiptap-version-preview ul {
+  list-style: disc outside;
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+
+.tiptap-post-editor ol,
+.tiptap-version-preview ol {
+  list-style: decimal outside;
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+
+.tiptap-post-editor li,
+.tiptap-version-preview li {
+  margin: 0.25rem 0;
+}
+
+.tiptap-post-editor li > p,
+.tiptap-version-preview li > p {
+  /* Tiptap wraps list-item content in <p>; kill its default block
+     margin so bullet items stay tight. */
+  margin: 0;
+}
+
+.tiptap-post-editor blockquote,
+.tiptap-version-preview blockquote {
+  border-left: 3px solid rgba(255, 255, 255, 0.15);
+  padding-left: 1rem;
+  margin: 0.75rem 0;
+  color: rgba(255, 255, 255, 0.75);
+  font-style: italic;
+}
+
+.tiptap-post-editor a,
+.tiptap-version-preview a {
+  color: #60a5fa; /* blue-400 */
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.tiptap-post-editor a:hover,
+.tiptap-version-preview a:hover {
+  color: #93c5fd; /* blue-300 */
+}

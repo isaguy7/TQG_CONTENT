@@ -123,7 +123,7 @@ function SearchSunnah({
     setMessage(null);
     try {
       const res = await fetch(
-        `/api/hadith/search?q=${encodeURIComponent(query.trim())}`
+        `/api/hadith/sunnah-search?q=${encodeURIComponent(query.trim())}`
       );
       const json = (await res.json()) as { results: SearchResult[] };
       setResults(json.results);

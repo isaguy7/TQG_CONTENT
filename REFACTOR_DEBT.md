@@ -49,6 +49,153 @@ Or cherry-pick the inverse of the archival commit.
 
 ## Active debt
 
+### Dual-surface /api/hadith routes
+
+Identified 2026-04-21 during V10 §7 commit 2.
+
+Parallel hadith search endpoints exist — same underlying corpus but
+different response shapes and intended callers:
+
+- `src/app/api/hadith/search/route.ts` (new, §7 picker) — corpus-only
+  fuzzy search over `hadith_corpus` via ILIKE + pg_trgm GIN indexes.
+  Auth: requireUser(). Response: `{ results, total, limit, offset, query }`.
+  Consumers (as of §7 commit 2): none yet — wires up in commit 3.
+- `src/app/api/hadith-corpus/search/route.ts` (legacy) — PostgreSQL
+  `websearch` full-text on `english_text` with an ILIKE fallback. No
+  auth check. Response: `{ results, total }`. Consumers (3):
+  - `src/components/HadithPanel.tsx:338`
+  - `src/components/FigureRefsPanel.tsx:381`
+  - `src/components/AmbientSuggestions.tsx:101`
+  - `src/app/(app)/hadith/page.tsx:39` (limit=0 total-count ping)
+- `src/app/api/hadith/sunnah-search/route.ts` (renamed 2026-04-21) —
+  live sunnah.com scraping via `searchSunnah()`. Freed up
+  `/api/hadith/search` for the §7 picker. One consumer:
+  `src/components/HadithPanel.tsx:126`.
+
+**Migration path:** when §9 (AI assistant) lands or a dedicated cleanup
+commit before M2, migrate the 3 `hadith-corpus/search` consumers to
+the new `/api/hadith/search` and delete the legacy route. The
+sunnah.com scraping stays as a separate capability (it's not corpus
+search — it queries the live site for hadith not yet ingested). Not
+urgent; endpoints don't conflict.
+
+### Hadith AI-suggestion verification flow (deferred to §9)
+
+Identified 2026-04-21 during V10 §7 scope revision. Original §7 spec
+included a full UNVERIFIED badge + sunnah.com confirm dialog flow.
+Product decision: corpus-picker attachments auto-verify since the user
+consciously picks from a 29,685-row library — no AI hallucination
+risk, verification toil is overkill. The hallucination risk lives in
+§9 when Claude suggests hadith for AI-generated content.
+
+The schema foundation shipped in §7 commit 1
+(`20260421100000_v10_hadith_verifications_proper.sql`) already has
+`verified` + `verified_at` + `verified_by` columns and the
+org-scoping FK. The publish-gate wired in §7 commit 4 already blocks
+posts with any `verified=false` refs.
+
+§9 to-do when AI suggestions land:
+- Claude-suggested hadith: insert `post_hadith_refs` row with
+  `source='ai_suggestion'` (added in §7 commit 3 migration
+  `20260421120000_v10_post_hadith_refs_source.sql`) and
+  `hadith_verifications` row with `verified=false` (vs the corpus
+  picker path which sets both to `'corpus_picker'` / `true`).
+- `AttachedHadithPanel` item — render red UNVERIFIED badge when
+  `verification.verified === false` OR `ref.source === 'ai_suggestion'`
+  (belt + suspenders; either signal alone should trigger the badge).
+- `VerifyHadithDialog` component — "Open sunnah.com →" button +
+  "I verified — mark VERIFIED" button.
+- `POST /api/hadith-verifications/[id]/verify` route — sets
+  `verified=true, verified_at=now(), verified_by=auth.user.id`.
+
+No DB migration required at that time — the publish-gate will
+naturally refuse to schedule/publish a post with unverified refs, so
+§9's AI suggestion path gets safety for free by inserting
+`verified=false`.
+
+### §9 cleanup: HadithPanel.tsx 586-line legacy component
+
+Identified 2026-04-21 during V10 §7 commit 3. Pre-V10
+`src/components/HadithPanel.tsx` still serves
+`/app/(app)/hadith/page.tsx` and exports `SearchCorpus` +
+`HadithRecord` + `CorpusRow` consumed by the editor's
+`AttachedHadithPanel`. §7 commit 3 keeps the `HadithRecord` type
+import alive (Q2 answer 2026-04-21 — migration off legacy was scope
+creep) but drops the `SearchCorpus` inline usage in favor of the
+new drawer-based `HadithPicker`.
+
+When §9 refactors `/hadith/page.tsx` (likely folded into the AI
+assistant's hadith browser) or the standalone hadith browser gets
+consolidated into the picker itself, absorb the shared exports at
+that time and delete `HadithPanel.tsx`. Also lift `hadith_corpus_id`
+through the parent's /api/posts/[id] GET so `AttachedHadithPanel`
+can populate a real `attachedCorpusIds` Set for the picker's Attach
+button gray-out (currently passes an empty Set — server-side
+idempotency absorbs the dupe-attach case).
+
+### Dual-surface /api/figures route
+
+Identified 2026-04-20 during V10 §6 commit 4.
+
+Both `src/app/api/figures/[id]/route.ts` (uuid-keyed) and
+`src/app/api/figures/by-slug/[slug]/route.ts` (slug-keyed) exist in
+parallel. The commit 4 spec originally called for deleting the `[id]`
+route; grepping the codebase revealed 5 consumers still fetching
+figures via `post.figure_id` UUID — deleting would cascade into the
+editor and the reference panels. Kept both routes instead.
+
+The slug-keyed route is nested under a static `by-slug/` parent
+rather than at the `/api/figures/[slug]` URL originally spec'd:
+Next.js disallows two different dynamic-segment names (`[id]` and
+`[slug]`) as siblings at the same level. Putting the slug route one
+level deeper is the minimal-touch fix; alternative would have been
+renaming `[id]` + migrating all 5 consumers.
+
+**`[id]` consumers (uuid-keyed):**
+- `src/components/FigureContextPanel.tsx` (figure metadata fetch inside
+  the editor's right-side context panel)
+- `src/components/FigureRefsPanel.tsx` (quran/hadith ref CRUD for the
+  figure editor experience)
+- `src/components/FigureAvailableRefs.tsx` (available refs dropdown)
+- `src/components/QuranBrowser.tsx` (adds verses to a figure)
+- `src/app/(app)/content/[id]/page.tsx` (loads figure by
+  `post.figure_id` for editor display)
+
+Plus sub-routes under `[id]/hadith/*` and `[id]/quran/*` consumed by
+the same set.
+
+**`[slug]` consumer (new):**
+- `src/app/(app)/figures/[slug]/page.tsx` (§6 detail page)
+
+**Migration path:** when §7 (hadith picker) and §8 (quran browser)
+refactor their figure-attachment flows, swap their uuid fetches to
+slug-keyed calls. At that point the `[id]` route and its sub-routes
+can be deleted. Not urgent; routes don't conflict and the duplication
+is purely read-layer.
+
+### Native browser-dialog call sites
+
+Identified 2026-04-19 during V10 §6 commit 2. `V10_Product_Context.md`
+added a UX rule forbidding `window.confirm` / `window.prompt` /
+`window.alert`. `ConfirmDialog` + `InputDialog` shipped in
+`src/components/shared/` as the replacement primitives; the sites
+below still use native dialogs and need migration as their sections
+are touched.
+
+| File | Line | Type | Planned migration |
+|------|-----:|------|-------------------|
+| `src/app/(app)/content/[id]/page.tsx` | 169 | `confirm` (soft delete draft) | §10 cleanup or §5 follow-up |
+| `src/app/(app)/content/page.tsx` | 129 | `confirm` | §4 kanban rewrite |
+| `src/app/(app)/content/page.tsx` | 163 | `confirm` (permanent delete from trash) | §4 kanban rewrite |
+| `src/app/(app)/hadith/page.tsx` | 51 | `confirm` (delete hadith row) | §7 hadith system rewrite |
+| `src/components/FigureRefsPanel.tsx` | 165 | `confirm` (remove ayah ref) | §6 later commit / §8 quran rewrite |
+| `src/components/FigureRefsPanel.tsx` | 416 | `confirm` (remove hadith ref) | §6 later commit / §7 hadith rewrite |
+| `src/components/editor/EditorToolbar.tsx` | 42 | `window.prompt` (link URL) | §5 follow-up — swap `window.prompt` for `InputDialog` |
+
+**First consumer of the new primitives:** §6 commit 5 (figure delete
+flow). Migrate the rest opportunistically — no standalone migration
+pass needed; they'll get touched as their owning sections rewrite.
+
 ### Files over 500 lines
 
 Identified 2026-04-18 during V10 M1 §1 inventory. Large files are harder to
