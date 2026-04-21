@@ -543,6 +543,7 @@ export default function PostEditorPage() {
         />
 
         <AttachedHadithPanel
+          postId={postId}
           attached={attached}
           availableHadith={availableHadith}
           onAttach={attachHadith}

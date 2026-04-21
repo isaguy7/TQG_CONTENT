@@ -95,10 +95,14 @@ org-scoping FK. The publish-gate wired in §7 commit 4 already blocks
 posts with any `verified=false` refs.
 
 §9 to-do when AI suggestions land:
-- Claude-suggested hadith: insert `hadith_verifications` row with
-  `verified=false` (instead of `true` as the corpus picker does).
-- `AttachedHadithPanel` item — render red UNVERIFIED badge
-  when `verification.verified === false`.
+- Claude-suggested hadith: insert `post_hadith_refs` row with
+  `source='ai_suggestion'` (added in §7 commit 3 migration
+  `20260421120000_v10_post_hadith_refs_source.sql`) and
+  `hadith_verifications` row with `verified=false` (vs the corpus
+  picker path which sets both to `'corpus_picker'` / `true`).
+- `AttachedHadithPanel` item — render red UNVERIFIED badge when
+  `verification.verified === false` OR `ref.source === 'ai_suggestion'`
+  (belt + suspenders; either signal alone should trigger the badge).
 - `VerifyHadithDialog` component — "Open sunnah.com →" button +
   "I verified — mark VERIFIED" button.
 - `POST /api/hadith-verifications/[id]/verify` route — sets
@@ -108,6 +112,26 @@ No DB migration required at that time — the publish-gate will
 naturally refuse to schedule/publish a post with unverified refs, so
 §9's AI suggestion path gets safety for free by inserting
 `verified=false`.
+
+### §9 cleanup: HadithPanel.tsx 586-line legacy component
+
+Identified 2026-04-21 during V10 §7 commit 3. Pre-V10
+`src/components/HadithPanel.tsx` still serves
+`/app/(app)/hadith/page.tsx` and exports `SearchCorpus` +
+`HadithRecord` + `CorpusRow` consumed by the editor's
+`AttachedHadithPanel`. §7 commit 3 keeps the `HadithRecord` type
+import alive (Q2 answer 2026-04-21 — migration off legacy was scope
+creep) but drops the `SearchCorpus` inline usage in favor of the
+new drawer-based `HadithPicker`.
+
+When §9 refactors `/hadith/page.tsx` (likely folded into the AI
+assistant's hadith browser) or the standalone hadith browser gets
+consolidated into the picker itself, absorb the shared exports at
+that time and delete `HadithPanel.tsx`. Also lift `hadith_corpus_id`
+through the parent's /api/posts/[id] GET so `AttachedHadithPanel`
+can populate a real `attachedCorpusIds` Set for the picker's Attach
+button gray-out (currently passes an empty Set — server-side
+idempotency absorbs the dupe-attach case).
 
 ### Dual-surface /api/figures route
 
