@@ -49,6 +49,66 @@ Or cherry-pick the inverse of the archival commit.
 
 ## Active debt
 
+### Dual-surface /api/hadith routes
+
+Identified 2026-04-21 during V10 §7 commit 2.
+
+Parallel hadith search endpoints exist — same underlying corpus but
+different response shapes and intended callers:
+
+- `src/app/api/hadith/search/route.ts` (new, §7 picker) — corpus-only
+  fuzzy search over `hadith_corpus` via ILIKE + pg_trgm GIN indexes.
+  Auth: requireUser(). Response: `{ results, total, limit, offset, query }`.
+  Consumers (as of §7 commit 2): none yet — wires up in commit 3.
+- `src/app/api/hadith-corpus/search/route.ts` (legacy) — PostgreSQL
+  `websearch` full-text on `english_text` with an ILIKE fallback. No
+  auth check. Response: `{ results, total }`. Consumers (3):
+  - `src/components/HadithPanel.tsx:338`
+  - `src/components/FigureRefsPanel.tsx:381`
+  - `src/components/AmbientSuggestions.tsx:101`
+  - `src/app/(app)/hadith/page.tsx:39` (limit=0 total-count ping)
+- `src/app/api/hadith/sunnah-search/route.ts` (renamed 2026-04-21) —
+  live sunnah.com scraping via `searchSunnah()`. Freed up
+  `/api/hadith/search` for the §7 picker. One consumer:
+  `src/components/HadithPanel.tsx:126`.
+
+**Migration path:** when §9 (AI assistant) lands or a dedicated cleanup
+commit before M2, migrate the 3 `hadith-corpus/search` consumers to
+the new `/api/hadith/search` and delete the legacy route. The
+sunnah.com scraping stays as a separate capability (it's not corpus
+search — it queries the live site for hadith not yet ingested). Not
+urgent; endpoints don't conflict.
+
+### Hadith AI-suggestion verification flow (deferred to §9)
+
+Identified 2026-04-21 during V10 §7 scope revision. Original §7 spec
+included a full UNVERIFIED badge + sunnah.com confirm dialog flow.
+Product decision: corpus-picker attachments auto-verify since the user
+consciously picks from a 29,685-row library — no AI hallucination
+risk, verification toil is overkill. The hallucination risk lives in
+§9 when Claude suggests hadith for AI-generated content.
+
+The schema foundation shipped in §7 commit 1
+(`20260421100000_v10_hadith_verifications_proper.sql`) already has
+`verified` + `verified_at` + `verified_by` columns and the
+org-scoping FK. The publish-gate wired in §7 commit 4 already blocks
+posts with any `verified=false` refs.
+
+§9 to-do when AI suggestions land:
+- Claude-suggested hadith: insert `hadith_verifications` row with
+  `verified=false` (instead of `true` as the corpus picker does).
+- `AttachedHadithPanel` item — render red UNVERIFIED badge
+  when `verification.verified === false`.
+- `VerifyHadithDialog` component — "Open sunnah.com →" button +
+  "I verified — mark VERIFIED" button.
+- `POST /api/hadith-verifications/[id]/verify` route — sets
+  `verified=true, verified_at=now(), verified_by=auth.user.id`.
+
+No DB migration required at that time — the publish-gate will
+naturally refuse to schedule/publish a post with unverified refs, so
+§9's AI suggestion path gets safety for free by inserting
+`verified=false`.
+
 ### Dual-surface /api/figures route
 
 Identified 2026-04-20 during V10 §6 commit 4.
