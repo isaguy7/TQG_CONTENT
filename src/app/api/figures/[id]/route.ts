@@ -16,6 +16,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     .from("islamic_figures")
     .select("*")
     .eq("id", params.id)
+    .is("deleted_at", null)
     .maybeSingle();
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

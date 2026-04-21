@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { ListSkeleton } from "@/components/shared/SafeList";
 import { cn } from "@/lib/utils";
@@ -47,11 +47,29 @@ export default function FiguresPage() {
   const [sort, setSort] = useState<SortKey>("name");
   const deferredQuery = useDeferredValue(query);
 
+  const [deletedFlash, setDeletedFlash] = useState<string | null>(null);
+
   useEffect(() => {
     fetch("/api/figures")
       .then((r) => r.json())
       .then((j) => setFigures((j.figures as IslamicFigureWithCounts[]) || []))
       .catch(() => setFigures([]));
+  }, []);
+
+  // Flash banner after a successful soft-delete. Uses window.location
+  // rather than useSearchParams so the page doesn't need a Suspense
+  // boundary for the sake of one query param.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const name = new URL(window.location.href).searchParams.get("deleted");
+    if (name) {
+      setDeletedFlash(name);
+      // Strip the query param from the URL so a refresh doesn't re-show
+      // the banner.
+      const url = new URL(window.location.href);
+      url.searchParams.delete("deleted");
+      window.history.replaceState({}, "", url.toString());
+    }
   }, []);
 
   // Counts per type — always computed from the full (pre-filter) set so
@@ -119,6 +137,22 @@ export default function FiguresPage() {
       }
     >
       <div className="space-y-4">
+        {deletedFlash ? (
+          <div className="flex items-center justify-between rounded-md border border-[#1B5E20]/40 bg-[#1B5E20]/15 px-3 py-2 text-[12px] text-[#4CAF50]">
+            <span>
+              Figure <span className="font-medium">{deletedFlash}</span> deleted.
+            </span>
+            <button
+              type="button"
+              onClick={() => setDeletedFlash(null)}
+              aria-label="Dismiss"
+              className="rounded p-1 text-[#4CAF50]/70 hover:text-[#4CAF50] hover:bg-[#1B5E20]/20"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : null}
+
         {/* Search + sort */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="relative flex-1 max-w-md">

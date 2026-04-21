@@ -44,6 +44,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     .from("islamic_figures")
     .select("*")
     .eq("slug", params.slug)
+    .is("deleted_at", null)
     .maybeSingle();
 
   if (figureErr) {
@@ -257,10 +258,15 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 /**
  * DELETE /api/figures/[slug]
  *
- * Soft-delete — but islamic_figures has no deleted_at column yet.
- * Commit 5 of §6 adds the column via migration; until then we stub
- * to 501 so the UI can wire the ConfirmDialog flow without actually
- * losing data.
+ * Soft-delete: sets deleted_at = now(). The by-slug GET, legacy
+ * [id] GET, and list GET all filter deleted_at IS NULL, so the
+ * figure vanishes from the library and mention dropdown. Posts that
+ * reference the figure retain their figure_id — the row stays in
+ * the table for FK integrity.
+ *
+ * Double-delete guard: .is('deleted_at', null) on the update means
+ * a second DELETE on the same slug returns 404 instead of silently
+ * re-stamping deleted_at.
  */
 export async function DELETE(_req: NextRequest, { params }: Params) {
   if (!SLUG_PATTERN.test(params.slug)) {
@@ -270,12 +276,21 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const auth = await requireUser();
   if ("response" in auth) return auth.response;
 
-  return NextResponse.json(
-    {
-      error: "NOT_IMPLEMENTED",
-      message:
-        "Soft delete requires islamic_figures.deleted_at — landing in §6 commit 5 migration.",
-    },
-    { status: 501 }
-  );
+  const db = createClient();
+  const { data, error } = await db
+    .from("islamic_figures")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("slug", params.slug)
+    .is("deleted_at", null)
+    .select()
+    .maybeSingle();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  if (!data) {
+    return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+  }
+
+  return NextResponse.json({ ok: true, figure: data as IslamicFigure });
 }
