@@ -38,6 +38,12 @@ export async function GET(req: NextRequest) {
  * POST /api/posts — create a draft. Status=ready is rejected at creation
  * by the DB trigger (see migration 20260416000002_publish_gate.sql).
  * Always create as idea/drafting, attach hadith, verify, then PATCH to ready.
+ *
+ * Resolves organization_id server-side from user_profiles
+ * .active_organization_id — posts.organization_id is NOT NULL since
+ * §2, and client callers (figure "Write new post about X" CTA,
+ * /content/new, etc.) don't know which org. Single-source-of-truth
+ * on the server keeps all create paths consistent.
  */
 export async function POST(req: NextRequest) {
   const auth = await requireUser();
@@ -58,6 +64,26 @@ export async function POST(req: NextRequest) {
   }
 
   const db = createClient();
+
+  const { data: profile, error: profileErr } = await db
+    .from("user_profiles")
+    .select("active_organization_id")
+    .eq("user_id", auth.user.id)
+    .maybeSingle();
+  if (profileErr) {
+    return NextResponse.json({ error: profileErr.message }, { status: 500 });
+  }
+  const organizationId = profile?.active_organization_id as string | null | undefined;
+  if (!organizationId) {
+    return NextResponse.json(
+      {
+        error: "NO_ACTIVE_ORG",
+        message: "User has no active organization",
+      },
+      { status: 400 }
+    );
+  }
+
   const { data, error } = await db
     .from("posts")
     .insert({
@@ -69,6 +95,7 @@ export async function POST(req: NextRequest) {
       transcript: body.transcript || null,
       status: "idea",
       user_id: auth.user.id,
+      organization_id: organizationId,
     })
     .select()
     .single();

@@ -37,11 +37,17 @@ export function currentWeekStart(d: Date = new Date()): string {
 export async function ensureCurrentWeek(userId: string): Promise<WeeklyCalendar> {
   const db = createClient();
   const week = currentWeekStart();
+  // content_calendar only has UNIQUE (week_start) today. onConflict was
+  // previously "user_id,week_start" — a composite that doesn't match
+  // any constraint, throwing "no unique or exclusion constraint matching
+  // the ON CONFLICT specification" and 500ing /api/calendar. Fine for
+  // M1 single-tenant; §13 adds proper (week_start, organization_id)
+  // scoping when the calendar UI rebuilds (see REFACTOR_DEBT).
   await db
     .from("content_calendar")
     .upsert(
       { week_start: week, user_id: userId },
-      { onConflict: "user_id,week_start", ignoreDuplicates: true }
+      { onConflict: "week_start", ignoreDuplicates: true }
     );
   const { data, error } = await db
     .from("content_calendar")
