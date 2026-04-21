@@ -113,6 +113,23 @@ naturally refuse to schedule/publish a post with unverified refs, so
 §9's AI suggestion path gets safety for free by inserting
 `verified=false`.
 
+### content_calendar org-scoping (deferred to §13)
+
+Identified 2026-04-21 during the §6+§7 smoke-test fix-up. The
+`content_calendar` table predates the §2 multi-tenancy migration;
+today it only has `UNIQUE (week_start)` (effectively single-tenant).
+The prior `ensureCurrentWeek()` upsert spec'd `onConflict:
+'user_id,week_start'` which matches no constraint and fell over
+with `"no unique or exclusion constraint matching the ON CONFLICT
+specification"`, 500ing `/api/calendar` whenever it fired.
+
+Fix-up narrowed the `onConflict` to `'week_start'` — correct for
+M1's single-user single-org reality. When §13 builds the calendar
+view + per-org scheduling UI, add an `organization_id` column, a
+UNIQUE `(week_start, organization_id)` constraint, and update
+`ensureCurrentWeek()` + `recordPublished()` to pass and scope by
+org.
+
 ### §9 cleanup: HadithPanel.tsx 586-line legacy component
 
 Identified 2026-04-21 during V10 §7 commit 3. Pre-V10
