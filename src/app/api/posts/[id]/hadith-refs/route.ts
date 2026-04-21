@@ -284,6 +284,10 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  // Detach only — delete the junction row. The hadith_verifications
+  // row is intentionally left alive for reuse / audit / re-attach.
+  // Orphan cleanup (deleting verifications when the last reference
+  // is removed) is deferred to §9 per REFACTOR_DEBT.md.
   const { data, error } = await db
     .from("post_hadith_refs")
     .delete()

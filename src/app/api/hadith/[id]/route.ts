@@ -74,11 +74,32 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   return NextResponse.json({ hadith: data });
 }
 
+/**
+ * DELETE /api/hadith/[id] — admin delete from the standalone /hadith
+ * page. Removes the hadith_verifications row entirely.
+ *
+ * The FK constraint post_hadith_refs_hadith_id_fkey is ON DELETE
+ * RESTRICT, so a verification attached to any post would blow up with
+ * "violates foreign key constraint" → bubbled as 500. That's Bug E
+ * on the §7 smoke test (2026-04-21). Fix: cascade-delete the junction
+ * rows first, then delete the verification. User intent when clicking
+ * Delete on /hadith is "get rid of this hadith entirely", so silently
+ * detaching it from any posts matches intent. Posts are not deleted.
+ */
 export async function DELETE(_req: NextRequest, { params }: Params) {
   if (!isUuid(params.id)) {
     return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
   }
   const db = createClient();
+
+  const { error: detachErr } = await db
+    .from("post_hadith_refs")
+    .delete()
+    .eq("hadith_id", params.id);
+  if (detachErr) {
+    return NextResponse.json({ error: detachErr.message }, { status: 500 });
+  }
+
   const { error } = await db
     .from("hadith_verifications")
     .delete()
