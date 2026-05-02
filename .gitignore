@@ -47,3 +47,6 @@ next-env.d.ts
 __pycache__/
 *.pyc
 .venv/
+
+# §8 NotebookLM ingest output (regenerable)
+data/notebooklm/output/

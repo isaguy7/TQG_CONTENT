@@ -49,6 +49,55 @@ Or cherry-pick the inverse of the archival commit.
 
 ## Active debt
 
+### §16: AI drawer positioning regression from PR #19
+
+Identified 2026-04-22 during post-§7 smoke test on production. The
+AI assistant drawer (`src/components/AiAssistantDrawer.tsx`) opens
+but renders as a thin horizontal bar pinned to the TOP of the
+viewport instead of a full-height right-side drawer — only the
+header strip is visible, and the bar obscures the page header
+buttons ("Copy to Claude", "Delete/Close"). Verified on the preview
+URL AND on production after PR #19 merged.
+
+Opens + closes correctly (Escape, × button, backdrop click), so
+no blocking error — cosmetic only.
+
+Likely causes (from inspection; not yet pinned down):
+- Drawer container missing `bottom-0` / `h-screen` — only top edge
+  anchored so content collapses to its natural height.
+- `flex-row` vs `flex-col` on the inner container — children laying
+  out horizontally instead of stacked.
+- Some ancestor (`transform` / `filter` / `contain`) creating a
+  containing block that breaks `position: fixed` semantics so
+  `inset-0` resolves to a smaller rect than viewport.
+- `overflow-hidden` added on the outer fixed div in PR #19 (Bug C
+  horizontal-scroll fix) may be interacting with the aside's
+  `h-full` + `absolute` positioning differently than expected.
+
+Deferred to §16 polish per 2026-04-22 product decision — the §9 AI
+assistant rebuild replaces this drawer wholesale, so fixing the
+regression now is throwaway work. Until then the drawer is
+effectively unreachable-without-knowing — the toggle works, the
+placeholder is there behind the bar, but the UI is visually broken.
+
+### §16: pg_trgm extension in public schema
+
+Identified 2026-04-22 during §8 commit 0 migration apply (Supabase
+advisor 0014). `pg_trgm` is currently installed in the `public`
+schema; Supabase recommends moving extensions into the `extensions`
+schema for cleaner namespacing.
+
+Low priority, cosmetic — no functional impact today. The fix
+requires `DROP EXTENSION CASCADE` (which drops every dependent GIN
+trigram index), `CREATE EXTENSION pg_trgm SCHEMA extensions`, then
+recreating the indexes. Indexes affected as of 2026-04-22:
+`idx_hadith_corpus_english_text_trgm`,
+`idx_hadith_corpus_arabic_text_trgm`,
+`idx_hadith_corpus_narrator_trgm`,
+`idx_scholarly_refs_legal_subject_trgm`.
+
+Defer to §16 polish — bundle with other Supabase advisor cleanups.
+
 ### Dual-surface /api/hadith routes
 
 Identified 2026-04-21 during V10 §7 commit 2.
